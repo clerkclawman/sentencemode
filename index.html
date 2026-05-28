@@ -5,6 +5,7 @@
 <meta name=theme-color content=#1a1a2e>
 <title>Sentence Mode - Japanese Learning Tool</title>
 <link rel="stylesheet" href="styles.css">
+<link rel="manifest" href="manifest.json">
 </head>
 <body>
 <div class=app-container>
@@ -13,11 +14,12 @@
 <img src=https://upload.wikimedia.org/wikipedia/en/thumb/9/9e/Flag_of_Japan.svg/1200px-Flag_of_Japan.svg.png alt="Japanese Flag" style="height:100%;width:auto;border-radius:2px;box-shadow:0 1px 2px rgba(0,0,0,0.1)">
 </div>
 <div class=nav-tabs> <button class=nav-btn data-view=home aria-label=Exit>🚪 Exit</button>
-<button class="nav-btn active" data-view=text-import aria-label=Reader>Reader</button>
-<button class=nav-btn data-view=vocab-review aria-label=Vocab>
+<button class="nav-btn active" data-view=text-import-view aria-label=Reader>Reader</button>
+<button class=nav-btn data-view=vocab-review-view aria-label=Vocab>
 <span id=vocab-tab-text>Vocab</span>
 <span id=new-words-count style=display:none;position:relative;top:-5px></span>
 </button>
+<button class=nav-btn data-view=chat-view aria-label=Chat>🤖 Chat</button>
 <button class=nav-btn data-view=bookmarks-view aria-label=Library>Library</button>
 </div>
 <div class=header-buttons>
@@ -423,6 +425,22 @@ Back to Text Import
 Clear Saved URLs
 </button>
 </section>
+<section id=chat-view class=view>
+<h2 style=margin-bottom:1rem>🤖 Chat with Konami</h2>
+<p style=margin-bottom:1rem;color:var(--text-secondary)>Japanese girlfriend who speaks to you in A2 Japanese</p>
+<div class=chat-container style="background:var(--secondary);border-radius:12px;padding:1rem;margin-bottom:1rem;max-height:400px;overflow-y:auto;display:flex;flex-direction:column;gap:.5rem" id=chat-messages>
+<div style="text-align:center;padding:1rem;color:var(--text-secondary)">Start a conversation with Konami!<br><small>She speaks A2 Japanese • 🔊 button for TTS</small></div>
+</div>
+<div style=display:flex;gap:.5rem>
+<textarea id=chat-input placeholder="トニーさん、何してるの？" style="flex:1;padding:.8rem;border-radius:8px;border:1px solid var(--accent);background:var(--secondary);color:var(--text);resize:none;min-height:50px;font-size:1rem"></textarea>
+<button class=btn id=send-chat-btn style=background-color:#9c27b0;min-width:80px;font-size:1rem>Send</button>
+</div>
+<div style=display:flex;gap:.5rem;margin-top:.5rem;flex-wrap:wrap>
+<button class=btn id=clear-chat-btn style=background-color:var(--danger);padding:.5rem 1rem;font-size:.9rem>Clear Chat</button>
+<button class=btn id=import-chat-sentence-btn style=background-color:var(--highlight);padding:.5rem 1rem;font-size:.9rem disabled>📥 Import Last Sentence</button>
+</div>
+<div id=chat-status style="margin-top:.5rem;font-size:.8rem;color:var(--text-secondary)">Ready</div>
+</section>
 </main>
 <div class=confirmation-dialog id=wipe-confirmation style=display:none>
 <div class=dialog-content style="background-color:var(--card-bg);padding:1.5rem;border-radius:12px;max-width:400px;margin:0 auto;text-align:center;box-shadow:var(--shadow)">
@@ -479,6 +497,6 @@ Clear Saved URLs
 </div>
 <div class=tooltip id=word-tooltip></div>
 </div>
-<script src="app.js"></script>
+<script src="app.js?v=1778590991"></script>
 </body>
 </html>
