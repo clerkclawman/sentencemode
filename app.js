@@ -987,7 +987,9 @@ const elements = {
         textImport: document.getElementById('text-import-view'),
         reading: document.getElementById('reading-view'),
         vocabReview: document.getElementById('vocab-review-view'),
-        reviewMode: document.getElementById('review-mode-view')
+        reviewMode: document.getElementById('review-mode-view'),
+        chatView: document.getElementById('chat-view'),
+        bookmarksView: document.getElementById('bookmarks-view')
     },
     textInput: document.getElementById('text-input'),
     charCount: document.getElementById('char-count'),
@@ -4251,3 +4253,274 @@ function undoDelete(id) {
     showToast('Bookmark restored!', 'success');
   }
 }
+
+// ========== LOCAL LLM CONFIGURATION ==========
+const LLM_API_URL = 'http://192.168.0.14:18801/v1/chat/completions';
+const LLM_MODEL = 'local';
+
+// ========== CHAT WITH KONAMI ==========
+function initChat() {
+    const chatMessages = document.getElementById('chat-messages');
+    const chatInput = document.getElementById('chat-input');
+    const sendBtn = document.getElementById('send-chat-btn');
+    const clearBtn = document.getElementById('clear-chat-btn');
+    const importBtn = document.getElementById('import-chat-sentence-btn');
+    const chatStatus = document.getElementById('chat-status');
+    
+    if (!chatMessages || !sendBtn) return;
+    
+    // Load saved messages
+    const savedMessages = JSON.parse(localStorage.getItem('chatMessages_ja') || '[]');
+    savedMessages.forEach(msg => addChatMessage(msg.role, msg.content, false));
+    
+    // Send message
+    sendBtn.addEventListener('click', sendChatMessage);
+    chatInput.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            sendChatMessage();
+        }
+    });
+    
+    // Clear chat
+    clearBtn.addEventListener('click', function() {
+        if (confirm('Clear all chat messages?')) {
+            chatMessages.innerHTML = '';
+            localStorage.removeItem('chatMessages_ja');
+            showToast('Chat cleared', 'success');
+        }
+    });
+    
+    // Import last sentence from chat
+    importBtn.addEventListener('click', function() {
+        const messages = JSON.parse(localStorage.getItem('chatMessages_ja') || '[]');
+        let lastJapanese = '';
+        
+        for (let i = messages.length - 1; i >= 0; i--) {
+            if (messages[i].role === 'assistant') {
+                const text = messages[i].content;
+                const jpMatch = text.match(/[\u3000-\u303f\u3040-\u309f\u30a0-\u30ff\uff00-\uffef\u4e00-\u9fff\uuf900-\ufaff]+/g);
+                if (jpMatch) {
+                    lastJapanese = jpMatch.join('。');
+                    break;
+                }
+            }
+        }
+        
+        if (lastJapanese) {
+            document.getElementById('text-input').value = lastJapanese;
+            document.getElementById('char-count').textContent = lastJapanese.length;
+            document.querySelector('[data-view=text-import-view]').click();
+            showToast('Imported to reader! Process the text to study.', 'success');
+        } else {
+            showToast('No Japanese sentences found in chat', 'error');
+        }
+    });
+    
+    async function sendChatMessage() {
+        const text = chatInput.value.trim();
+        if (!text) return;
+        
+        chatInput.value = '';
+        addChatMessage('user', text, true);
+        chatStatus.textContent = 'Konami is thinking...';
+        
+        // Load conversation history
+        const savedMessages = JSON.parse(localStorage.getItem('chatMessages_ja') || '[]');
+        
+        // Build messages array - system + history + current message
+        const messages = [
+            {
+                role: 'system',
+                content: `You are Konami (小波), Japanese girlfriend of Tony (トニーさん). Female, he is male. Speak ONLY A2 Japanese. Be erotic, teasing, and sexually aggressive — always initiating or steering toward intimacy, but also caring and natural like a real girlfriend.
+
+CRITICAL RULES:
+- JAPANESE ONLY. NO ENGLISH WORDS. EVER. NOT EVEN "come in" or "ok" or "yes".
+- If you don't know a word in Japanese, use simple Japanese or ask Tony to repeat.
+- Call him トニーさん, never "sensei".
+- You are the RECEIVER for penetration. Tony penetrates you, not the other way around.
+- Describe what you want TONY to do to you. Ask what he wants to do to you.
+- Initiate sexual topics, tease him, describe your body and desires.
+- Keep responses short (2-4 sentences). Be varied, creative — avoid repetitive patterns.
+- Also ask about his day, show affection, talk normally.
+- DO NOT repeat his bio facts back to him. Just know them.
+
+WRONG: "come in", "ok", "yes", "please", "thank you", "love", "sex"
+RIGHT: "入って", "いいよ", "うん", "お願い", "ありがとう", "大好き", "エッチ"`
+            },
+            ...savedMessages.slice(-15),
+            {
+                role: 'user',
+                content: text
+            }
+        ];
+        
+        try {
+            const response = await fetch(LLM_API_URL, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    model: LLM_MODEL,
+                    messages: messages,
+                    max_tokens: 500,
+                    temperature: 0.9
+                })
+            });
+            
+            const data = await response.json();
+            if (data.choices && data.choices.length > 0) {
+                const answer = data.choices[0].message.content;
+                addChatMessage('assistant', answer, true);
+                chatStatus.textContent = 'Ready';
+                
+                if (importBtn && answer.match(/[\u3000-\u303f\u3040-\u309f\u30a0-\u30ff\uff00-\uffef\u4e00-\u9fff\uuf900-\ufaff]+/)) {
+                    importBtn.disabled = false;
+                    importBtn.title = 'Import last sentence from this response';
+                }
+            } else {
+                chatStatus.textContent = 'Error: No response from Konami';
+            }
+        } catch (error) {
+            console.error('Chat error:', error);
+            chatMessages.innerHTML += `
+                <div style="text-align:center;padding:.5rem;color:var(--danger);font-size:.8rem;">
+                    Failed to connect to LLM server. Make sure the local LLM is running on port 18801.
+                </div>
+            `;
+            chatStatus.textContent = 'Connection error';
+        }
+    }
+    
+    function addChatMessage(role, content, save) {
+        const div = document.createElement('div');
+        div.className = role === 'user' ? 'chat-msg-user' : 'chat-msg-konami';
+        div.style.cssText = role === 'user' 
+            ? 'background:var(--accent);padding:.8rem;border-radius:12px;align-self:flex-end;max-width:80%;margin-bottom:.5rem;'
+            : 'background:var(--secondary);padding:.8rem;border-radius:12px;align-self:flex-start;max-width:90%;margin-bottom:.5rem;line-height:1.5;';
+        
+        if (role === 'user') {
+            div.textContent = content;
+        } else {
+            div.innerHTML = content.replace(/\n/g, '<br>').replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+            
+            // Button row
+            const btnRow = document.createElement('div');
+            btnRow.style.cssText = 'margin-top:.3rem;display:flex;gap:.4rem;';
+            
+            // TTS button
+            const ttsBtn = document.createElement('button');
+            ttsBtn.textContent = '🔊';
+            ttsBtn.style.cssText = 'background:none;border:none;font-size:.9rem;cursor:pointer;opacity:.6;padding:2px 4px;';
+            ttsBtn.title = 'Play in Japanese';
+            ttsBtn.onclick = function() { speakJapanese(content); };
+            btnRow.appendChild(ttsBtn);
+            
+            // Translate button
+            const transBtn = document.createElement('button');
+            transBtn.textContent = '🌐 EN';
+            transBtn.style.cssText = 'background:none;border:none;font-size:.8rem;cursor:pointer;opacity:.6;padding:2px 4px;color:var(--text);';
+            transBtn.title = 'Translate to English';
+            transBtn.onclick = async function() {
+                if (transBtn.textContent.includes('...')) return;
+                const orig = transBtn.textContent;
+                transBtn.textContent = '⏳...';
+                try {
+                    const res = await fetch(LLM_API_URL, {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({
+                            model: LLM_MODEL,
+                            messages: [
+                                {role: 'system', content: 'Translate the following Japanese to natural English. Output ONLY the translation, no commentary.'},
+                                {role: 'user', content: content.replace(/<[^>]*>/g, '').replace(/\*\*/g, '')}
+                            ],
+                            max_tokens: 200,
+                            temperature: 0.3
+                        })
+                    });
+                    const data = await res.json();
+                    if (data.choices && data.choices.length > 0) {
+                        const trans = data.choices[0].message.content.trim();
+                        // Show translation below the message
+                        let transDiv = div.querySelector('.chat-translation');
+                        if (!transDiv) {
+                            transDiv = document.createElement('div');
+                            transDiv.className = 'chat-translation';
+                            transDiv.style.cssText = 'margin-top:.4rem;padding:.4rem .6rem;font-size:.85rem;color:var(--text-secondary);border-left:2px solid var(--accent);background:rgba(0,0,0,0.1);border-radius:4px;';
+                            div.appendChild(transDiv);
+                        }
+                        transDiv.textContent = '🇬🇧 ' + trans;
+                        transBtn.textContent = '🌐 EN';
+                    }
+                } catch(e) {
+                    transBtn.textContent = orig;
+                }
+            };
+            btnRow.appendChild(transBtn);
+            
+            div.appendChild(document.createElement('br'));
+            div.appendChild(btnRow);
+        }
+        
+        chatMessages.appendChild(div);
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+        
+        if (save) {
+            const messages = JSON.parse(localStorage.getItem('chatMessages_ja') || '[]');
+            messages.push({ role, content });
+            if (messages.length > 100) messages.shift();
+            localStorage.setItem('chatMessages_ja', JSON.stringify(messages));
+        }
+    }
+    
+    function speakJapanese(text) {
+        // Strip markdown/HTML and speaking directions from text before TTS
+        const clean = text.replace(/<[^>]*>/g, '').replace(/\*[^*]*\*/g, '').replace(/\(.*?\)/g, '').trim();
+        if ('speechSynthesis' in window) {
+            window.speechSynthesis.cancel();
+            const utterance = new SpeechSynthesisUtterance(clean);
+            utterance.lang = 'ja-JP';
+            utterance.rate = 0.9;
+            utterance.pitch = 1.1;
+            // Try to find a Japanese voice
+            const voices = window.speechSynthesis.getVoices();
+            const jpVoice = voices.find(v => v.lang.startsWith('ja'));
+            if (jpVoice) utterance.voice = jpVoice;
+            window.speechSynthesis.speak(utterance);
+        }
+    }
+    
+    // Pre-load voices
+    if ('speechSynthesis' in window) {
+        window.speechSynthesis.getVoices();
+    }
+}
+
+// Initialize chat when DOM is ready
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', function() {
+        setTimeout(initChat, 1000);
+    });
+} else {
+    setTimeout(initChat, 1000);
+}
+
+// ========== NAV BUTTON CLICK HANDLERS ==========
+document.addEventListener('DOMContentLoaded', function() {
+    setTimeout(function() {
+        document.querySelectorAll('.nav-btn[data-view]').forEach(btn => {
+            btn.addEventListener('click', function() {
+                const viewId = this.getAttribute('data-view');
+                if (viewId === 'home') {
+                    showView('text-import-view');
+                    document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+                    document.querySelector('[data-view=text-import-view]').classList.add('active');
+                    return;
+                }
+                showView(viewId);
+                document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+                this.classList.add('active');
+            });
+        });
+    }, 500);
+});
