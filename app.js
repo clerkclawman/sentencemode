@@ -12,6 +12,25 @@ function addScrollListener(element, handler) {
         element.addEventListener('scroll', handler);
     }
 }
+
+// Humorous substitutions
+function applyHumorousSubstitutions(text) {
+    if (!state.humorousMode) return text;
+    const substitutions = {
+        "dad": "father",
+        "ball": "octopus",
+        "cat": "ninja cat",
+        "dog": "robot dog",
+        "eat": "nom nom",
+        "sleep": "zzz"
+    };
+    let result = text;
+    for (const [from, to] of Object.entries(substitutions)) {
+        const regex = new RegExp(`\\b${from}\\b`, 'gi');
+        result = result.replace(regex, to);
+    }
+    return result;
+}
 // RSS Feed functionality
 document.querySelectorAll('.rss-feed').forEach(feed => {
     feed.addEventListener('click', (e) => {
@@ -41,45 +60,45 @@ document.getElementById('close-rss-results').addEventListener('click', () => {
 
 async function loadRSSFeed(feedElement) {
     if (!feedElement || !feedElement.hasAttribute('data-url')) return;
-    
+
     const feedUrl = feedElement.getAttribute('data-url');
     const feedName = feedElement.getAttribute('data-name');
-    
+
     try {
         // Show loading state
         const spinner = feedElement.querySelector('.loading-spinner');
         if (spinner) spinner.style.display = 'inline-block';
         if (feedElement.style) feedElement.style.opacity = '0.7';
-        
+
         document.getElementById('rss-feed-name').textContent = `(${feedName})`;
         document.getElementById('rss-results-list').innerHTML = '';
         document.getElementById('rss-results-container').style.display = 'block';
-        
+
         // Try multiple CORS proxies if first one fails
 const proxyUrls = [
     'https://api.allorigins.win/raw?url=',
     'https://corsproxy.io/?',
     'https://proxy.cors.sh/?'
 ];
-        
+
         let xmlText = '';
         let lastError = null;
-        
+
     // Modified proxy handling
     for (const proxyUrl of proxyUrls) {
         try {
-            const proxyToUse = proxyUrl.includes('?') 
+            const proxyToUse = proxyUrl.includes('?')
                 ? `${proxyUrl}${encodeURIComponent(feedUrl)}`
                 : `${proxyUrl}${encodeURIComponent(feedUrl)}`;
-                
+
             const response = await fetch(proxyToUse, {
                 headers: proxyUrl.includes('cors.sh') ? {
                     'x-cors-api-key': 'temp_0a3b1c2d3e4f5g6h7i8j9k0l1m2n3o4p'
                 } : {}
             });
-            
+
             if (!response.ok) throw new Error(`Proxy ${proxyUrl} returned status ${response.status}`);
-            
+
             xmlText = await response.text();
             if (xmlText) break; // Success - exit loop
         } catch (error) {
@@ -88,24 +107,24 @@ const proxyUrls = [
             continue;
         }
     }
-        
+
         if (!xmlText) {
             throw lastError || new Error('All proxy attempts failed');
         }
-        
+
         // Parse the XML
         const parser = new DOMParser();
         const xmlDoc = parser.parseFromString(xmlText, "text/xml");
-        
+
 // Extract articles and convert to array
 const items = Array.from(xmlDoc.querySelectorAll('item'));
 if (items.length === 0) throw new Error('No articles found in feed');
 
 // Sort items by date (newest first)
 items.sort((a, b) => {
-    const dateA = new Date(a.querySelector('pubDate')?.textContent || 
+    const dateA = new Date(a.querySelector('pubDate')?.textContent ||
                  a.querySelector('date')?.textContent || 0);
-    const dateB = new Date(b.querySelector('pubDate')?.textContent || 
+    const dateB = new Date(b.querySelector('pubDate')?.textContent ||
                  b.querySelector('date')?.textContent || 0);
     return dateB - dateA;
 });
@@ -115,22 +134,22 @@ const resultsList = document.getElementById('rss-results-list');
 resultsList.innerHTML = '';
 
 items.slice(0, 10).forEach((item) => {  // Still limit to 10 articles
-            
+
             const title = item.querySelector('title')?.textContent || 'No title';
             let description = item.querySelector('description')?.textContent || '';
-            
+
             // Clean up description (remove HTML tags)
             description = description.replace(/<[^>]*>/g, '');
-            
+
             const link = item.querySelector('link')?.textContent || '#';
-            
+
             const articleDiv = document.createElement('div');
             articleDiv.className = 'resource-link';
             articleDiv.style.alignItems = 'flex-start';
             articleDiv.style.flexDirection = 'column';
             articleDiv.style.padding = '1rem';
             articleDiv.style.marginBottom = '0.5rem';
-            
+
      // Try to extract date from the item (different RSS feeds have different date formats)
 let pubDate = '';
 if (item.querySelector('pubDate')) {
@@ -161,38 +180,38 @@ articleDiv.innerHTML = `
         ${description.substring(0, 150)}${description.length > 150 ? '...' : ''}
     </div>
     <div style="display: flex; gap: 0.5rem;">
-        <button class="btn import-article-btn" 
+        <button class="btn import-article-btn"
                 style="padding: 0.3rem 0.6rem; font-size: 0.8rem;"
-                data-title="${escapeHtml(title)}" 
+                data-title="${escapeHtml(title)}"
                 data-content="${escapeHtml(description)}">
             Import Text
         </button>
-        <a href="${link}" class="btn" 
+        <a href="${link}" class="btn"
            style="padding: 0.3rem 0.6rem; font-size: 0.8rem; background-color: var(--accent);"
            target="_blank" rel="noopener">
             Read Full Article
         </a>
     </div>
 `;
-            
+
             resultsList.appendChild(articleDiv);
         });
-        
+
         // Add event listeners to import buttons
         document.querySelectorAll('.import-article-btn').forEach(btn => {
             btn.addEventListener('click', (e) => {
                 const title = e.target.getAttribute('data-title');
                 const content = e.target.getAttribute('data-content');
-                
+
                 document.getElementById('text-input').value = `${title}\n\n${content}`;
                 document.getElementById('char-count').textContent = `${title}\n\n${content}`.length;
                 document.getElementById('rss-results-container').style.display = 'none';
-                
+
                 showToast('Article imported! Click "Process Text" to continue.', 'success');
                 document.getElementById('text-input').scrollIntoView({ behavior: 'smooth' });
             });
         });
-        
+
     } catch (error) {
         console.error('Error loading RSS feed:', error);
         showToast(`Failed to load ${feedName}. Please try again later.`, 'error');
@@ -216,13 +235,13 @@ async function fetchWithProxy(url, options = {}) {
         'https://proxy.cors.sh/?',
         'https://corsproxy.io/?'
     ];
-    
+
     for (const proxy of proxies) {
         try {
-            const proxyUrl = proxy.includes('?') 
+            const proxyUrl = proxy.includes('?')
                 ? `${proxy}${encodeURIComponent(url)}`
                 : `${proxy}${encodeURIComponent(url)}`;
-                
+
             const response = await fetch(proxyUrl, {
                 ...options,
                 headers: proxy.includes('cors.sh') ? {
@@ -230,7 +249,7 @@ async function fetchWithProxy(url, options = {}) {
                     ...options.headers
                 } : options.headers
             });
-            
+
             if (!response.ok) continue;
             return await response.text();
         } catch (e) {
@@ -248,7 +267,7 @@ async function tryFetchMethods(url) {
     } catch (e) {
         console.log('Direct fetch failed:', e);
     }
-    
+
     // Then try with proxy
     try {
         const result = await fetchWithProxy(url);
@@ -256,7 +275,7 @@ async function tryFetchMethods(url) {
     } catch (e) {
         console.log('Proxy fetch failed:', e);
     }
-    
+
     return null;
 }
 
@@ -316,27 +335,27 @@ function cleanJapaneseText(text) {
 async function importUrlContent(url) {
     try {
         showToast('Fetching content...', 'info');
-        
+
         // Use a proxy to avoid CORS issues
         const proxyUrl = 'https://api.allorigins.win/raw?url=' + encodeURIComponent(url);
         const response = await fetch(proxyUrl);
-        
+
         if (!response.ok) throw new Error('Failed to fetch content');
-        
+
         let html = await response.text();
-        
+
         // Create a temporary DOM element to parse the HTML
         const parser = new DOMParser();
         const doc = parser.parseFromString(html, 'text/html');
-        
+
         // Remove script and style elements
         const scripts = doc.querySelectorAll('script, style, noscript, iframe, img');
         scripts.forEach(el => el.remove());
-        
+
         // Get text content from main content areas
         let text = '';
         const contentSelectors = ['article', 'main', '.post-content', '.entry-content', 'body'];
-        
+
         for (const selector of contentSelectors) {
             const element = doc.querySelector(selector);
             if (element) {
@@ -344,28 +363,28 @@ async function importUrlContent(url) {
                 break;
             }
         }
-        
+
         // Fallback to body if no specific content found
         if (!text) {
             text = doc.body.textContent;
         }
-        
+
         // Clean up the text
         text = text.replace(/\s+/g, ' ').trim();
-        
+
         if (!text) throw new Error('No text content found');
-        
+
         // Put the text in the input field and scroll to it
         const textInput = document.getElementById('text-input');
         textInput.value = text;
         document.getElementById('char-count').textContent = text.length;
         textInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
         textInput.focus();
-        
+
         // Switch to import view but don't process automatically
         showView('text-import-view');
         showToast('Content loaded! Review and click "Process Text" to continue', 'success');
-        
+
     } catch (error) {
         console.error('Import error:', error);
         showToast('Failed to import: ' + error.message, 'error');
@@ -376,13 +395,13 @@ async function getFeedWithFallback(url, feedName) {
         // First try with CORS proxy
         const proxyUrl = 'https://api.allorigins.win/raw?url=' + encodeURIComponent(url);
         const response = await fetch(proxyUrl);
-        
+
         if (!response.ok) throw new Error('Failed to fetch feed');
-        
+
         return await response.text();
     } catch (error) {
         console.log(`Primary feed ${feedName} failed, trying alternatives...`);
-        
+
         // Define alternative URLs for each feed
         const alternatives = {
             'NHK Easy News': [
@@ -413,7 +432,7 @@ async function getFeedWithFallback(url, feedName) {
                 if (altUrl !== url) { // Don't retry the same URL
                     const proxyUrl = 'https://api.allorigins.win/raw?url=' + encodeURIComponent(altUrl);
                     const response = await fetch(proxyUrl);
-                    
+
                     if (response.ok) {
                         return await response.text();
                     }
@@ -422,7 +441,7 @@ async function getFeedWithFallback(url, feedName) {
                 console.log(`Alternative ${feedName} URL failed:`, altUrl, e);
             }
         }
-        
+
         throw new Error(`All ${feedName} feed attempts failed`);
     }
 }
@@ -462,6 +481,7 @@ languageUsage: JSON.parse(localStorage.getItem('languageUsage')) || {},
     currentFontSize: parseInt(localStorage.getItem('fontSize_ja')) || 16,
     currentLineHeight: parseFloat(localStorage.getItem('lineHeight_ja')) || 1.6,
     autoTranslate: localStorage.getItem('autoTranslate_ja') === 'true',
+    humorousMode: localStorage.getItem('humorous_ja') === 'true',
 
 readingStats: JSON.parse(localStorage.getItem('readingStats_ja')) || {
     streak: 0,
@@ -508,7 +528,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         updateVocabTabCounter();
     } catch (error) {
         console.error('Failed to initialize database:', error);
-        
+
         // Fallback to localStorage if IndexedDB fails
         try {
             const backup = localStorage.getItem('vocab_backup');
@@ -529,7 +549,7 @@ function createDailyBackup() {
         // Only backup once per day
         const today = new Date().toDateString();
         const lastBackupDate = localStorage.getItem('lastBackupDate');
-        
+
         if (lastBackupDate !== today) {
             getAllVocabWords().then(words => {
                 localStorage.setItem('vocab_backup', JSON.stringify(words));
@@ -548,12 +568,12 @@ async function addVocabWord(word) {
             if (!db) {
                 throw new Error('Database not initialized');
             }
-            
+
             const transaction = db.transaction([STORE_VOCAB], 'readwrite');
             const store = transaction.objectStore(STORE_VOCAB);
             const wordIndex = store.index('word');
             const request = wordIndex.get(word.word);
-            
+
             request.onsuccess = () => {
                 if (request.result) {
                     reject(new Error('Word already exists in vocabulary'));
@@ -579,7 +599,7 @@ async function addVocabWord(word) {
 function initAudio() {
     try {
         state.audioContext = new (window.AudioContext || window.webkitAudioContext)();
-        
+
         // Correct answer sound (Japanese "correct" bell)
         state.sounds.correct = () => {
             const osc = state.audioContext.createOscillator();
@@ -587,16 +607,16 @@ function initAudio() {
             osc.type = 'triangle';
             osc.frequency.value = 880;
             gain.gain.value = 0.5;
-            
+
             osc.connect(gain);
             gain.connect(state.audioContext.destination);
-            
+
             osc.start();
             osc.frequency.exponentialRampToValueAtTime(1760, state.audioContext.currentTime + 0.1);
             gain.gain.exponentialRampToValueAtTime(0.001, state.audioContext.currentTime + 0.3);
             osc.stop(state.audioContext.currentTime + 0.3);
         };
-        
+
         // Incorrect answer sound (Japanese "wrong" buzzer)
         state.sounds.incorrect = () => {
             const osc = state.audioContext.createOscillator();
@@ -604,34 +624,34 @@ function initAudio() {
             osc.type = 'sawtooth';
             osc.frequency.value = 220;
             gain.gain.value = 0.5;
-            
+
             osc.connect(gain);
             gain.connect(state.audioContext.destination);
-            
+
             osc.start();
             osc.frequency.exponentialRampToValueAtTime(110, state.audioContext.currentTime + 0.3);
             gain.gain.exponentialRampToValueAtTime(0.001, state.audioContext.currentTime + 0.5);
             osc.stop(state.audioContext.currentTime + 0.5);
         };
-        
+
         // Round complete sound (Japanese "congratulations" flourish)
         state.sounds.complete = () => {
             const notes = [523.25, 587.33, 659.25, 698.46, 783.99, 880];
             const gain = state.audioContext.createGain();
             gain.gain.value = 0.5;
             gain.connect(state.audioContext.destination);
-            
+
             notes.forEach((freq, i) => {
                 const osc = state.audioContext.createOscillator();
                 osc.type = 'sine';
                 osc.frequency.value = freq;
                 osc.connect(gain);
-                
+
                 osc.start(state.audioContext.currentTime + i * 0.1);
                 osc.stop(state.audioContext.currentTime + i * 0.1 + 0.3);
             });
         };
-        
+
         // Card flip sound
         state.sounds.flip = () => {
             const osc = state.audioContext.createOscillator();
@@ -639,10 +659,10 @@ function initAudio() {
             osc.type = 'square';
             osc.frequency.value = 440;
             gain.gain.value = 0.3;
-            
+
             osc.connect(gain);
             gain.connect(state.audioContext.destination);
-            
+
             osc.start();
             osc.frequency.exponentialRampToValueAtTime(880, state.audioContext.currentTime + 0.05);
             gain.gain.exponentialRampToValueAtTime(0.001, state.audioContext.currentTime + 0.1);
@@ -680,7 +700,7 @@ function addToWordCache(word, translation) {
         const toRemove = keys.slice(0, Math.floor(keys.length * 0.2));
         toRemove.forEach(key => delete state.wordLookupCache[key]);
     }
-    
+
     state.wordLookupCache[word] = {
         translation,
         timestamp: Date.now()
@@ -697,10 +717,10 @@ function getFromWordCache(word) {
 }
 function toggleBookmark() {
     if (state.sentences.length === 0) return;
-    
+
     const currentSentence = state.sentences[state.currentSentenceIndex];
     const index = state.bookmarks.findIndex(b => b.id === currentSentence.id);
-    
+
     if (index === -1) {
         // Add to bookmarks
         state.bookmarks.push({
@@ -720,27 +740,27 @@ if (favoriteBtn) {
         document.getElementById('favorite-sentence-btn').classList.remove('active');
         showToast('Removed from bookmarks', 'error');
     }
-    
+
     localStorage.setItem('bookmarks_ja', JSON.stringify(state.bookmarks));
     renderBookmarks();
 }
 function renderBookmarks() {
     const container = document.getElementById('bookmarks-list');
     if (!container) return;
-    
+
     container.innerHTML = '';
-    
+
     // Load both bookmarks and history if not loaded
     const savedBookmarks = localStorage.getItem('bookmarks_ja');
     const savedHistory = localStorage.getItem('textHistory_ja');
-    
+
     if (savedBookmarks) {
         state.bookmarks = JSON.parse(savedBookmarks);
     }
     if (savedHistory) {
         state.textHistory = JSON.parse(savedHistory);
     }
-    
+
     if (state.bookmarks.length === 0 && state.textHistory.length === 0) {
         container.innerHTML = `
             <p style="padding: 1rem; color: var(--text-secondary);">
@@ -749,7 +769,7 @@ function renderBookmarks() {
         `;
         return;
     }
-    
+
     // Show bookmarks first
     if (state.bookmarks.length > 0) {
         const bookmarksHeader = document.createElement('h3');
@@ -757,17 +777,17 @@ function renderBookmarks() {
         bookmarksHeader.style.margin = '1rem 0 0.5rem 0';
         bookmarksHeader.style.color = 'var(--highlight)';
         container.appendChild(bookmarksHeader);
-        
-        const sortedBookmarks = [...state.bookmarks].sort((a, b) => 
+
+        const sortedBookmarks = [...state.bookmarks].sort((a, b) =>
             new Date(b.date) - new Date(a.date)
         );
-        
+
         sortedBookmarks.forEach(bookmark => {
             const item = document.createElement('div');
             item.className = 'resource-link';
             item.style.alignItems = 'center';
             item.style.padding = '0.8rem';
-            
+
             // Use title if available, otherwise create one from content
 let displayText = bookmark.title || '';
 if (!displayText && bookmark.sentence) {
@@ -778,13 +798,13 @@ if (!displayText && bookmark.sentence) {
         displayText += '...';
     }
 }
-            
+
             item.innerHTML = `
                 <span style="flex: 1;">${displayText}</span>
                 <span style="font-size: 0.8rem; color: var(--text-secondary); margin-right: 0.5rem;">
                     ${new Date(bookmark.date).toLocaleDateString()}
                 </span>
-                <button class="nav-btn" 
+                <button class="nav-btn"
                         style="background-color: var(--danger); padding: 0.3rem;"
                         data-bookmark-id="${bookmark.id}"
                         aria-label="Remove bookmark">
@@ -794,7 +814,7 @@ if (!displayText && bookmark.sentence) {
             container.appendChild(item);
         });
     }
-    
+
     // Then show reading history
     if (state.textHistory.length > 0) {
         const historyHeader = document.createElement('h3');
@@ -802,45 +822,45 @@ if (!displayText && bookmark.sentence) {
         historyHeader.style.margin = '1rem 0 0.5rem 0';
         historyHeader.style.color = 'var(--highlight)';
         container.appendChild(historyHeader);
-        
+
         // Filter out expired items (older than 24 hours)
         const now = new Date();
         state.textHistory = state.textHistory.filter(item => {
             const itemDate = new Date(item.timestamp);
             return (now - itemDate) < (24 * 60 * 60 * 1000); // 24 hours
         });
-        
+
         state.textHistory.forEach((item, index) => {
             const historyItem = document.createElement('div');
             historyItem.className = 'resource-link';
             historyItem.style.marginBottom = '0.5rem';
             historyItem.style.alignItems = 'center';
-            
+
             const progressBar = document.createElement('div');
             progressBar.style.width = '100%';
             progressBar.style.height = '4px';
             progressBar.style.backgroundColor = 'var(--secondary)';
             progressBar.style.borderRadius = '2px';
             progressBar.style.marginTop = '0.5rem';
-            
+
             const progressFill = document.createElement('div');
             progressFill.style.height = '100%';
             progressFill.style.width = `${item.progress || 0}%`;
             progressFill.style.backgroundColor = 'var(--highlight)';
             progressFill.style.borderRadius = '2px';
             progressBar.appendChild(progressFill);
-            
+
             historyItem.innerHTML = `
                 <span style="flex: 1;">${item.title}</span>
                 <span style="font-size: 0.8rem; color: var(--text-secondary); margin-right: 0.5rem;">
                     ${Math.round(item.progress || 0)}%
                 </span>
-                <button class="nav-btn" style="padding: 0.2rem 0.5rem;" 
+                <button class="nav-btn" style="padding: 0.2rem 0.5rem;"
                     data-history-index="${index}" aria-label="Load text">Load</button>
-                <button class="nav-btn" style="background-color: var(--danger); padding: 0.2rem 0.5rem;" 
+                <button class="nav-btn" style="background-color: var(--danger); padding: 0.2rem 0.5rem;"
                     data-history-index="${index}" aria-label="Delete text">✕</button>
             `;
-            
+
             historyItem.appendChild(progressBar);
             container.appendChild(historyItem);
         });
@@ -859,7 +879,7 @@ document.getElementById('import-all-btn').addEventListener('click', importAllSen
             e.stopPropagation();
         });
     });
-    
+
     container.querySelectorAll('[data-history-index]').forEach(btn => {
         btn.addEventListener('click', (e) => {
             const index = parseInt(e.target.dataset.historyIndex);
@@ -874,31 +894,31 @@ document.getElementById('import-all-btn').addEventListener('click', importAllSen
 function saveCustomUrl() {
     const urlInput = document.getElementById('custom-url-input');
     const url = urlInput.value.trim();
-    
+
     if (!url) {
         showToast('Please enter a URL', 'error');
         return;
     }
-    
+
     // Basic URL validation
     if (!url.startsWith('http://') && !url.startsWith('https://')) {
         showToast('Please enter a valid URL (include http:// or https://)', 'error');
         return;
     }
-    
+
     // Create a title from the URL or prompt for one
-    const title = prompt("Enter a title for this URL (or leave blank to use domain name):", 
+    const title = prompt("Enter a title for this URL (or leave blank to use domain name):",
                         new URL(url).hostname.replace('www.', ''));
-    
+
     if (title === null) return; // User cancelled
-    
+
     const urlObj = {
         id: generateUUID(),
         url: url,
         title: title || new URL(url).hostname.replace('www.', ''),
         date: new Date().toISOString()
     };
-    
+
     state.savedUrls.unshift(urlObj);
     localStorage.setItem('savedUrls_ja', JSON.stringify(state.savedUrls));
     urlInput.value = '';
@@ -909,31 +929,31 @@ function saveCustomUrl() {
 function renderSavedUrls() {
     const container = document.querySelector('#bookmarks-list');
     container.innerHTML = '';
-    
+
     if (state.savedUrls.length === 0) {
         container.innerHTML = '<p style="padding: 1rem; color: var(--text-secondary);">No saved URLs yet</p>';
         return;
     }
-    
+
     state.savedUrls.forEach(url => {
         const item = document.createElement('div');
         item.className = 'resource-link';
         item.style.alignItems = 'center';
-        
+
         item.innerHTML = `
             <span style="flex: 1;">${url.title}</span>
             <span style="font-size: 0.8rem; color: var(--text-secondary); margin-right: 0.5rem;">
                 ${new Date(url.date).toLocaleDateString()}
             </span>
-            <button class="nav-btn" style="background-color: var(--highlight); padding: 0.3rem 0.6rem;" 
+            <button class="nav-btn" style="background-color: var(--highlight); padding: 0.3rem 0.6rem;"
                 data-url="${url.url}" aria-label="Import URL">Import</button>
-            <button class="nav-btn" style="background-color: var(--danger); padding: 0.3rem 0.6rem;" 
+            <button class="nav-btn" style="background-color: var(--danger); padding: 0.3rem 0.6rem;"
                 data-url-id="${url.id}" aria-label="Delete URL">✕</button>
         `;
-        
+
         container.appendChild(item);
     });
- 
+
     // Add event listeners to delete buttons
     container.querySelectorAll('[data-url-id]').forEach(btn => {
         btn.addEventListener('click', (e) => {
@@ -968,14 +988,14 @@ function showToast(message, type = '') {
     const toast = document.getElementById('toast');
     toast.textContent = message;
     toast.className = 'toast';
-    
+
     // Only add class if type is not empty
     if (type) {
         toast.classList.add(type);
     }
-    
+
     toast.classList.add('show');
-    
+
     setTimeout(() => {
         toast.classList.remove('show');
     }, 3000);
@@ -1040,6 +1060,7 @@ const elements = {
     closeSettings: document.getElementById('close-settings'),
 
     autoTranslateToggle: document.getElementById('auto-translate-toggle'),
+    humorousToggle: document.getElementById('humorous-toggle'),
     fontSelect: document.getElementById('font-select'),
     fontSizeRange: document.getElementById('font-size-range'),
     lineHeightRange: document.getElementById('line-height-range'),
@@ -1069,7 +1090,7 @@ function initSettingsPanel() {
     elements.fontSizeRange.value = state.currentFontSize;
     elements.lineHeightRange.value = state.currentLineHeight;
     elements.themeSelect.value = state.theme;
-    
+
     // Update stats display
     updateStatsDisplay();
     // Streak reminder
@@ -1081,20 +1102,20 @@ if (state.readingStats.streak > 3 && state.readingStats.lastActiveDate !== new D
         elements.settingsPanel.classList.add('open');
         elements.settingsOverlay.classList.add('open');
     });
-    
+
     elements.closeSettings.addEventListener('click', () => {
         elements.settingsPanel.classList.remove('open');
         elements.settingsOverlay.classList.remove('open');
     });
-    
+
     elements.settingsOverlay.addEventListener('click', () => {
         elements.settingsPanel.classList.remove('open');
         elements.settingsOverlay.classList.remove('open');
     });
-    
 
-   
-    
+
+
+
     elements.autoTranslateToggle.addEventListener('change', (e) => {
         state.autoTranslate = e.target.checked;
         localStorage.setItem('autoTranslate_ja', state.autoTranslate);
@@ -1102,38 +1123,46 @@ if (state.readingStats.streak > 3 && state.readingStats.lastActiveDate !== new D
             translateCurrentSentence();
         }
     });
-    
+
+    elements.humorousToggle.addEventListener('change', (e) => {
+        state.humorousMode = e.target.checked;
+        localStorage.setItem('humorous_ja', state.humorousMode);
+        if (state.currentView === 'reading-view' && state.sentences.length > 0) {
+            showToast('Humorous mode ' + (state.humorousMode ? 'enabled' : 'disabled'), 'info');
+        }
+    });
+
     elements.fontSelect.addEventListener('change', (e) => {
         state.currentFont = e.target.value;
         localStorage.setItem('font_ja', state.currentFont);
         document.documentElement.setAttribute('data-font', state.currentFont);
     });
-    
+
 elements.fontSizeRange.addEventListener('input', (e) => {
     state.currentFontSize = e.target.value;
     localStorage.setItem('fontSize_ja', state.currentFontSize);
     document.documentElement.style.setProperty('--font-size', `${state.currentFontSize}px`);
-    
+
     // Force redraw of cards if in matching game
     if (state.currentView === 'review-mode-view' && state.reviewMode && state.reviewMode !== 'hard') {
         setupMatchingGame();
     }
 });
-    
+
     elements.lineHeightRange.addEventListener('input', (e) => {
         state.currentLineHeight = e.target.value;
         localStorage.setItem('lineHeight_ja', state.currentLineHeight);
         document.documentElement.style.setProperty('--line-height', state.currentLineHeight);
     });
-    
+
     elements.themeSelect.addEventListener('change', (e) => {
         state.theme = e.target.value;
         localStorage.setItem('theme_ja', state.theme);
         document.documentElement.setAttribute('data-theme', state.theme);
         elements.themeToggle.textContent = state.theme === 'dark' ? '🌙' : '☀️';
     });
-    
-    
+
+
     // Jump to sentence
     elements.jumpBtn.addEventListener('click', () => {
         const sentenceNum = parseInt(elements.jumpInput.value);
@@ -1142,7 +1171,7 @@ elements.fontSizeRange.addEventListener('input', (e) => {
             displaySentence();
         }
     });
-    
+
     elements.jumpInput.addEventListener('keypress', (e) => {
         if (e.key === 'Enter') {
             elements.jumpBtn.click();
@@ -1167,7 +1196,7 @@ function updateStatsDisplay() {
         state.readingStats.dailyTime = 0;
         localStorage.setItem('readingStats_ja', JSON.stringify(state.readingStats));
     }
-    
+
     elements.streakCount.textContent = state.readingStats.streak;
     elements.wordsLearnedCount.textContent = state.readingStats.wordsLearned;
     elements.timeSpentCount.textContent = `${Math.floor(state.readingStats.timeSpent / 60)} min`;
@@ -1185,16 +1214,16 @@ function startReadingSession() {
 function addWordClickHandlers() {
     // Clear previous click handlers
     elements.sentenceDisplay.onclick = null;
-    
+
     // Add new click handler for word lookup
     elements.sentenceDisplay.onclick = (e) => {
         const selection = window.getSelection();
         const selectedText = selection.toString().trim();
-        
+
         if (selectedText.length > 0) {
             const range = selection.getRangeAt(0);
             const rect = range.getBoundingClientRect();
-            
+
             // Show tooltip with word lookup
             showWordTooltip(selectedText, rect.left, rect.top - 30);
         }
@@ -1227,10 +1256,10 @@ let db;
 async function openDatabase() {
     return new Promise((resolve, reject) => {
         const request = indexedDB.open(DB_NAME, DB_VERSION);
-        
+
         request.onupgradeneeded = (event) => {
             const db = event.target.result;
-            
+
             // Create object stores if they don't exist
             if (!db.objectStoreNames.contains(STORE_SENTENCES)) {
                 const sentencesStore = db.createObjectStore(STORE_SENTENCES, { keyPath: 'id' });
@@ -1242,7 +1271,7 @@ async function openDatabase() {
                     sentencesStore.createIndex('position', 'position', { unique: true });
                 }
             }
-            
+
             if (!db.objectStoreNames.contains(STORE_VOCAB)) {
                 const vocabStore = db.createObjectStore(STORE_VOCAB, { keyPath: 'id' });
                 vocabStore.createIndex('bucket', 'bucket', { unique: false });
@@ -1260,29 +1289,29 @@ async function openDatabase() {
                     vocabStore.createIndex('favorite', 'favorite', { unique: false });
                 }
             }
-            
+
             if (!db.objectStoreNames.contains(STORE_TRANSLATIONS)) {
                 const translationsStore = db.createObjectStore(STORE_TRANSLATIONS, { keyPath: 'id' });
                 translationsStore.createIndex('text', 'text', { unique: true });
             }
         };
-        
+
         request.onsuccess = (event) => {
             const db = event.target.result;
-            
+
             // Add error handling for database operations
             db.onerror = (event) => {
                 console.error('Database error:', event.target.error);
             };
-            
+
             resolve(db);
         };
-        
+
         request.onerror = (event) => {
             console.error('Failed to open database:', event.target.error);
             reject(event.target.error);
         };
-        
+
         request.onblocked = (event) => {
             console.warn('Database access blocked - likely due to version change');
             // Try to close any existing connections and reopen
@@ -1301,11 +1330,11 @@ async function verifyDatabaseIntegrity() {
         if (!db) {
             db = await openDatabase();
         }
-        
+
         // Check if all object stores exist
         const stores = [STORE_SENTENCES, STORE_VOCAB, STORE_TRANSLATIONS];
         const missingStores = stores.filter(store => !db.objectStoreNames.contains(store));
-        
+
         if (missingStores.length > 0) {
             console.warn('Missing object stores:', missingStores);
             // Force a database upgrade by incrementing version
@@ -1314,7 +1343,7 @@ async function verifyDatabaseIntegrity() {
             DB_VERSION = oldVersion + 1;
             db = await openDatabase();
         }
-        
+
         return true;
     } catch (error) {
         console.error('Database integrity check failed:', error);
@@ -1326,7 +1355,7 @@ function getAllVocabWords() {
         const transaction = db.transaction([STORE_VOCAB], 'readonly');
         const store = transaction.objectStore(STORE_VOCAB);
         const request = store.getAll();
-        
+
         request.onsuccess = () => resolve(request.result);
         request.onerror = (event) => reject(event.target.error);
     });
@@ -1334,12 +1363,12 @@ function getAllVocabWords() {
 function renderVocabList(words) {
     const container = document.getElementById('vocab-list');
     container.innerHTML = '';
-    
+
     if (!words || words.length === 0) {
         container.innerHTML = '<p style="padding: 1rem; color: var(--text-secondary);">No vocabulary words yet</p>';
         return;
     }
-    
+
     // Sort by bucket (new > easy > medium > hard) then alphabetically
     const bucketOrder = { 'new': 0, 'easy': 1, 'medium': 2, 'hard': 3 };
     words.sort((a, b) => {
@@ -1348,14 +1377,14 @@ function renderVocabList(words) {
         }
         return a.word.localeCompare(b.word);
     });
-    
+
     words.forEach(word => {
         const item = document.createElement('div');
         item.className = 'resource-link';
         item.style.alignItems = 'center';
         item.style.padding = '0.8rem';
         item.style.marginBottom = '0.5rem';
-        
+
         item.innerHTML = `
             <div style="flex: 1; min-width: 0;">
                 <div style="font-weight: bold; font-size: 1.1rem;">${word.word}</div>
@@ -1365,14 +1394,14 @@ function renderVocabList(words) {
                 <span style="font-size: 0.8rem; color: var(--text-secondary);">
                     ${word.bucket}
                 </span>
-                <button class="nav-btn" style="background-color: var(--danger); padding: 0.3rem 0.6rem;" 
+                <button class="nav-btn" style="background-color: var(--danger); padding: 0.3rem 0.6rem;"
                     data-word-id="${word.id}" aria-label="Delete word">✕</button>
             </div>
         `;
-        
+
         container.appendChild(item);
     });
-    
+
     // Add event listeners to delete buttons
     container.querySelectorAll('[data-word-id]').forEach(btn => {
         btn.addEventListener('click', async (e) => {
@@ -1380,11 +1409,11 @@ function renderVocabList(words) {
             try {
                 await deleteVocabWord(id);
                 showToast('Word deleted', 'success');
-                
+
                 // Refresh the list
                 const words = await getAllVocabWords();
                 renderVocabList(words);
-                
+
                 // Update counts everywhere
                 updateBucketCounts();
                 const counts = await countVocabByBucket();
@@ -1405,11 +1434,11 @@ function wipeAllData() {
         const sentencesStore = transaction.objectStore(STORE_SENTENCES);
         const vocabStore = transaction.objectStore(STORE_VOCAB);
         const translationsStore = transaction.objectStore(STORE_TRANSLATIONS);
-        
+
         sentencesStore.clear();
         vocabStore.clear();
         translationsStore.clear();
-        
+
         transaction.oncomplete = () => resolve();
         transaction.onerror = (event) => reject(event.target.error);
     });
@@ -1433,18 +1462,18 @@ function showHistoryView() {
     if (savedHistory) {
         state.textHistory = JSON.parse(savedHistory);
     }
-    
+
     // Filter out expired items (older than 24 hours)
     const now = new Date();
     state.textHistory = state.textHistory.filter(item => {
         const itemDate = new Date(item.timestamp);
         return (now - itemDate) < (24 * 60 * 60 * 1000); // 24 hours
     });
-    
+
     // Display history
     const historyList = document.getElementById('history-list');
     historyList.innerHTML = '';
-    
+
     if (state.textHistory.length === 0) {
         historyList.innerHTML = '<p>No recent texts found</p>';
     } else {
@@ -1452,25 +1481,25 @@ function showHistoryView() {
             const historyItem = document.createElement('div');
             historyItem.className = 'resource-link';
             historyItem.style.marginBottom = '0.5rem';
-            
+
 let preview = item.title || item.text.split(/\s+/).slice(0, 3).join(' ');
 if (item.text.length > preview.length) {
     preview += '...';
-}          
+}
 historyItem.innerHTML = `
     <span style="flex: 1;">${preview}</span>
     <span style="font-size: 0.8rem; color: var(--text-secondary); margin-right: 0.5rem;">
         ${new Date(item.timestamp).toLocaleDateString()}
     </span>
-    <button class="nav-btn" style="padding: 0.3rem 0.6rem;" 
+    <button class="nav-btn" style="padding: 0.3rem 0.6rem;"
         data-history-index="${index}" aria-label="Load text">Load</button>
-    <button class="nav-btn" style="background-color: var(--danger); padding: 0.3rem 0.6rem;" 
+    <button class="nav-btn" style="background-color: var(--danger); padding: 0.3rem 0.6rem;"
         data-history-index="${index}" aria-label="Delete text">✕</button>
 `;
-            
+
             historyList.appendChild(historyItem);
         });
-        
+
         // Add event listeners to the new buttons
         document.querySelectorAll('[data-history-index]').forEach(btn => {
             btn.addEventListener('click', (e) => {
@@ -1483,7 +1512,7 @@ historyItem.innerHTML = `
             });
         });
     }
-    
+
     showView('history-view');
 }
 
@@ -1515,7 +1544,7 @@ function deleteVocabWord(id) {
         const transaction = db.transaction([STORE_VOCAB], 'readwrite');
         const store = transaction.objectStore(STORE_VOCAB);
         const request = store.delete(id);
-        
+
         request.onsuccess = () => resolve();
         request.onerror = (event) => reject(event.target.error);
     });
@@ -1524,13 +1553,13 @@ function addSentences(sentences) {
     return new Promise((resolve, reject) => {
         const transaction = db.transaction([STORE_SENTENCES], 'readwrite');
         const store = transaction.objectStore(STORE_SENTENCES);
-        
+
         store.clear().onsuccess = () => {
             sentences.forEach((sentence, index) => {
                 sentence.position = index;
                 store.add(sentence);
             });
-            
+
             transaction.oncomplete = () => resolve();
             transaction.onerror = (event) => reject(event.target.error);
         };
@@ -1543,7 +1572,7 @@ function getAllSentences() {
         const store = transaction.objectStore(STORE_SENTENCES);
         const index = store.index('position');
         const request = index.getAll();
-        
+
         request.onsuccess = () => resolve(request.result);
         request.onerror = (event) => reject(event.target.error);
     });
@@ -1554,7 +1583,7 @@ function updateSentence(sentence) {
         const transaction = db.transaction([STORE_SENTENCES], 'readwrite');
         const store = transaction.objectStore(STORE_SENTENCES);
         const request = store.put(sentence);
-        
+
         request.onsuccess = () => resolve();
         request.onerror = (event) => reject(event.target.error);
     });
@@ -1566,7 +1595,7 @@ function getVocabByBucket(bucket) {
         const store = transaction.objectStore(STORE_VOCAB);
         const index = store.index('bucket');
         const request = index.getAll(IDBKeyRange.only(bucket));
-        
+
         request.onsuccess = () => resolve(request.result);
         request.onerror = (event) => reject(event.target.error);
     });
@@ -1577,7 +1606,7 @@ function updateVocabWord(word) {
         const transaction = db.transaction([STORE_VOCAB], 'readwrite');
         const store = transaction.objectStore(STORE_VOCAB);
         const request = store.put(word);
-        
+
         request.onsuccess = () => resolve();
         request.onerror = (event) => reject(event.target.error);
     });
@@ -1587,25 +1616,25 @@ function countVocabByBucket() {
     return new Promise((resolve, reject) => {
         const buckets = ['new', 'easy', 'medium', 'hard'];
         const counts = {};
-        
+
         const transaction = db.transaction([STORE_VOCAB], 'readonly');
         const store = transaction.objectStore(STORE_VOCAB);
         const index = store.index('bucket');
-        
+
         let completed = 0;
-        
+
         buckets.forEach(bucket => {
             const request = index.count(IDBKeyRange.only(bucket));
-            
+
             request.onsuccess = () => {
                 counts[bucket] = request.result;
                 completed++;
-                
+
                 if (completed === buckets.length) {
                     resolve(counts);
                 }
             };
-            
+
             request.onerror = (event) => reject(event.target.error);
         });
     });
@@ -1613,11 +1642,11 @@ function countVocabByBucket() {
 
 // Text processing
 function splitSentences(text) {
-    const SPLIT_REGEX = /(?<=[。！？\n]|[\u3002\uff01\uff1f])/;
+    const SPLIT_REGEX = /(?<=[。!?\n]|[\u3002\uff01\uff1f])/;
     const sentences = text.split(SPLIT_REGEX)
         .map(s => s.trim())
         .filter(s => s.length > 0);
-    
+
     // Further split long sentences
     return sentences.flatMap(sentence => {
         if (sentence.length > 100) {
@@ -1672,10 +1701,10 @@ async function getCachedTranslation(text, sourceLang, targetLang) {
         const transaction = db.transaction([STORE_TRANSLATIONS], 'readonly');
         const store = transaction.objectStore(STORE_TRANSLATIONS);
         const index = store.index('text');
-        
+
         // Use get() instead of getAll() to get just one match
         const request = index.get(`${sourceLang}|${targetLang}|${text}`);
-        
+
         request.onsuccess = () => {
             if (request.result) {
                 // Check if translation is recent (within 30 days)
@@ -1693,7 +1722,7 @@ async function getCachedTranslation(text, sourceLang, targetLang) {
                 resolve(null);
             }
         };
-        
+
         request.onerror = (event) => reject(event.target.error);
     });
 }
@@ -1702,18 +1731,18 @@ async function cacheTranslation(text, sourceLang, targetLang, translatedText) {
     return new Promise((resolve, reject) => {
         const transaction = db.transaction([STORE_TRANSLATIONS], 'readwrite');
         const store = transaction.objectStore(STORE_TRANSLATIONS);
-        
+
         // First check if translation already exists
         const index = store.index('text');
         const request = index.get(`${sourceLang}|${targetLang}|${text}`);
-        
+
         request.onsuccess = () => {
             if (request.result) {
                 // Translation exists - update it
                 const existing = request.result;
                 existing.translatedText = translatedText;
                 existing.timestamp = new Date().getTime();
-                
+
                 const updateRequest = store.put(existing);
                 updateRequest.onsuccess = () => resolve();
                 updateRequest.onerror = (event) => reject(event.target.error);
@@ -1725,13 +1754,13 @@ async function cacheTranslation(text, sourceLang, targetLang, translatedText) {
                     translatedText: translatedText,
                     timestamp: new Date().getTime()
                 };
-                
+
                 const addRequest = store.add(translation);
                 addRequest.onsuccess = () => resolve();
                 addRequest.onerror = (event) => reject(event.target.error);
             }
         };
-        
+
         request.onerror = (event) => reject(event.target.error);
     });
 }
@@ -1739,7 +1768,7 @@ async function cacheTranslation(text, sourceLang, targetLang, translatedText) {
 function toggleTranslationMode(showTranslate) {
     const importContainer = document.getElementById('import-container');
     const translateContainer = document.getElementById('translate-container');
-    
+
     if (showTranslate) {
         importContainer.style.display = 'none';
         translateContainer.style.display = 'block';
@@ -1806,37 +1835,37 @@ if (firstVisit) {
 function speakText(text) {
     if ('speechSynthesis' in window) {
         window.speechSynthesis.cancel();
-        
+
         const utterance = new SpeechSynthesisUtterance(text);
         utterance.lang = 'ja-JP';
-           
+
         state.currentTtsUtterance = utterance;
-        
+
         if (speechSynthesis.getVoices().length === 0) {
             speechSynthesis.onvoiceschanged = () => {
                 const voices = speechSynthesis.getVoices();
-                const japaneseVoice = voices.find(voice => 
+                const japaneseVoice = voices.find(voice =>
                     voice.lang === 'ja-JP' || voice.lang.startsWith('ja')
                 );
-                
+
                 if (japaneseVoice) {
                     utterance.voice = japaneseVoice;
                 }
-                
+
                 speechSynthesis.speak(utterance);
             };
             // Force voices to load
             speechSynthesis.getVoices();
         } else {
             const voices = speechSynthesis.getVoices();
-            const japaneseVoice = voices.find(voice => 
+            const japaneseVoice = voices.find(voice =>
                 voice.lang === 'ja-JP' || voice.lang.startsWith('ja')
             );
-            
+
             if (japaneseVoice) {
                 utterance.voice = japaneseVoice;
             }
-            
+
             speechSynthesis.speak(utterance);
         }
     }
@@ -1872,12 +1901,12 @@ localStorage.setItem('recentLanguages', JSON.stringify(recentLangs));
     Object.values(elements.views).forEach(view => {
         view.classList.remove('active');
     });
-    
+
     const view = document.getElementById(viewId);
     if (view) {
         view.classList.add('active');
         state.currentView = viewId;
-        
+
         // Start/end reading session tracking
         if (viewId === 'reading-view') {
             startReadingSession();
@@ -1897,7 +1926,7 @@ function updateBucketCounts() {
                 document.getElementById(`manage-${bucket}-count`).textContent = count;
             }
         });
-        
+
         const selectedBucket = state.reviewMode;
         if (selectedBucket && counts[selectedBucket] > 0) {
             elements.startReviewBtn.disabled = false;
@@ -1912,7 +1941,7 @@ function updateBucketCounts() {
 function displaySentence() {
     // Save current position to localStorage
     localStorage.setItem('lastSentencePosition_ja', JSON.stringify(state.currentSentenceIndex));
-    
+
     if (state.sentences.length === 0) {
         elements.sentenceDisplay.textContent = 'No sentences available.';
         if (elements.translationDisplay) {
@@ -1921,24 +1950,24 @@ function displaySentence() {
         document.getElementById('sentence-counter').textContent = 'Sentence 0/0';
         return;
     }
-    
+
     const sentence = state.sentences[state.currentSentenceIndex];
-    elements.sentenceDisplay.textContent = sentence.original;
+    elements.sentenceDisplay.textContent = applyHumorousSubstitutions(sentence.original);
 
 
-    
+
     elements.sentenceDisplay.classList.add('current-sentence');
     elements.wordSelectionBox.style.display = 'none';
-    
-    document.getElementById('sentence-counter').textContent = 
+
+    document.getElementById('sentence-counter').textContent =
         `Sentence ${state.currentSentenceIndex + 1}/${state.sentences.length}`;
-    
+
     // Update jump input
     elements.jumpInput.value = state.currentSentenceIndex + 1;
-    
+
     if (elements.translationDisplay) {
         elements.translationDisplay.style.display = 'none';
-        
+
         if (sentence.cached_translation) {
             elements.translationDisplay.textContent = sentence.cached_translation;
             if (state.autoTranslate) {
@@ -1946,13 +1975,13 @@ function displaySentence() {
             }
         }
     }
-    
+
     // Pre-load next and previous sentences
     preloadAdjacentSentences();
-    
+
     // Add click handlers for word lookup
     addWordClickHandlers();
-    
+
     // Safely update favorite button state if it exists
     const favoriteBtn = document.getElementById('favorite-sentence-btn');
     if (favoriteBtn) {
@@ -1973,7 +2002,7 @@ function preloadAdjacentSentences() {
             });
         }
     }
-    
+
     // Pre-load previous sentence translation if not already loaded
     if (state.currentSentenceIndex > 0) {
         const prevSentence = state.sentences[state.currentSentenceIndex - 1];
@@ -1990,13 +2019,13 @@ function showWordTooltip(word, x, y) {
         displayTooltipWithOptions(state.wordLookupCache[word], word, x, y);
         return;
     }
-    
+
     // Try to find the word in vocabulary
     const transaction = db.transaction([STORE_VOCAB], 'readonly');
     const store = transaction.objectStore(STORE_VOCAB);
     const index = store.index('word');
     const request = index.get(word);
-    
+
     request.onsuccess = () => {
         if (request.result) {
             const translation = request.result.translation;
@@ -2027,18 +2056,18 @@ function displayTooltipWithOptions(text, word, x, y) {
             </div>
         </div>
     `;
-    
+
     tooltip.style.left = `${x}px`;
     tooltip.style.top = `${y - 60}px`; // Position above cursor
     tooltip.classList.add('show');
-    
+
     // Add event listeners to buttons
     tooltip.querySelector('[data-action="lookup"]').addEventListener('click', () => {
         elements.selectedWord.textContent = word;
         elements.wordSelectionBox.style.display = 'block';
         tooltip.classList.remove('show');
     });
-    
+
     tooltip.querySelector('[data-action="translate"]').addEventListener('click', async () => {
         try {
             const translation = await translateSentence(word);
@@ -2048,7 +2077,7 @@ function displayTooltipWithOptions(text, word, x, y) {
         }
         tooltip.classList.remove('show');
     });
-    
+
     // Close tooltip when clicking outside
     setTimeout(() => {
         const closeTooltip = (e) => {
@@ -2066,7 +2095,7 @@ function displayTooltip(text, x, y) {
     elements.wordTooltip.style.left = `${x}px`;
     elements.wordTooltip.style.top = `${y}px`;
     elements.wordTooltip.classList.add('show');
-    
+
     setTimeout(() => {
         elements.wordTooltip.classList.remove('show');
     }, 2000);
@@ -2168,7 +2197,7 @@ async function tryWiktionaryAPI(word) {
         // Parse Japanese definitions
         if (data.ja) {
             const definitions = [];
-            
+
             // Extract all English definitions
             for (const entry of data.ja) {
                 if (entry.definitions) {
@@ -2192,7 +2221,7 @@ async function tryWiktionaryAPI(word) {
         // Fallback to English definitions if no Japanese found
         if (data.en) {
             const definitions = [];
-            
+
             for (const entry of data.en) {
                 if (entry.definitions) {
                     for (const def of entry.definitions) {
@@ -2235,7 +2264,7 @@ document.getElementById('lookup-word').addEventListener('click', async () => {
         entriesContainer.innerHTML = '';
 
         const { source, result, word: displayWord } = await lookupWordInDictionary(word);
-        
+
         const entryDiv = document.createElement('div');
         entryDiv.className = 'dictionary-entry';
         entryDiv.innerHTML = `
@@ -2243,15 +2272,15 @@ document.getElementById('lookup-word').addEventListener('click', async () => {
             ${result}<br>
             <small>Source: ${source}</small>
         `;
-        
+
         entryDiv.addEventListener('click', () => {
             document.getElementById('vocab-translation').value = result;
             document.getElementById('dictionary-results').style.display = 'none';
         });
-        
+
         entriesContainer.appendChild(entryDiv);
         document.getElementById('dictionary-results').style.display = 'block';
-        
+
         showToast(`Definition found (${source})`, 'success');
     } catch (error) {
         console.error('Dictionary error:', error);
@@ -2264,15 +2293,15 @@ document.getElementById('lookup-word').addEventListener('click', async () => {
 
 function translateCurrentSentence() {
     if (state.sentences.length === 0 || !elements.translationDisplay) return;
-    
+
     const sentence = state.sentences[state.currentSentenceIndex].original;
     elements.translationDisplay.style.display = 'block';
     elements.translationDisplay.textContent = "Translating...";
-    
+
     translateSentence(sentence).then(translation => {
         elements.translationDisplay.textContent = translation;
         state.sentences[state.currentSentenceIndex].cached_translation = translation;
-        
+
         // Add copy button
         if (!document.getElementById('copy-translation-btn')) {
             const copyBtn = document.createElement('button');
@@ -2302,22 +2331,22 @@ async function startReview(bucket) {
     elements.reviewQuestion.style.display = 'none';
     elements.matchingGameContainer.style.display = 'none';
     elements.hardModeContainer.style.display = 'none';
-    
+
     state.reviewMode = bucket;
     state.reviewWords = await getVocabByBucket(bucket);
-    
+
     if (state.reviewWords.length === 0) {
         showToast('No words to review in this category!', 'error');
         return;
     }
-    
+
     state.reviewWords = shuffleArray(state.reviewWords);
     state.currentReviewIndex = 0;
     state.reviewStats = { correct: 0, incorrect: 0 };
     state.currentHardStreak = 0;
-    
+
     showView('review-mode-view');
-    
+
     if (bucket === 'hard') {
         setupHardMode();
     } else {
@@ -2332,11 +2361,11 @@ function exitReview() {
     if (elements.reviewQuestion) elements.reviewQuestion.style.display = 'none';
     if (elements.matchingGameContainer) elements.matchingGameContainer.style.display = 'none';
     if (elements.hardModeContainer) elements.hardModeContainer.style.display = 'none';
-    
+
 // Show header when exiting review
 const header = document.querySelector('header');
 if (header) header.classList.remove('hidden');
-    
+
     state.currentHardStreak = 0; // Reset streak when exiting
     showView('vocab-review-view');
 }
@@ -2360,17 +2389,17 @@ function setupMatchingGame() {
     elements.rightColumn.innerHTML = '';
     elements.reviewQuestion.style.display = 'none';
     elements.hardModeContainer.style.display = 'none';
-    
+
     // Get words for this round (max 5)
     let wordsToShow = state.reviewWords.slice(state.currentReviewIndex, state.currentReviewIndex + 5);
-    
+
     // Ensure we always show 5 pairs (10 cards) if available
     if (wordsToShow.length < 5 && state.reviewWords.length >= 5) {
         // If we have fewer than 5 words but more available, take from beginning
         const remainingWords = 5 - wordsToShow.length;
         wordsToShow = wordsToShow.concat(state.reviewWords.slice(0, remainingWords));
     }
-    
+
     state.currentRoundWords = wordsToShow;
 
     // Show matching game container and shuffle button
@@ -2391,7 +2420,7 @@ function setupMatchingGame() {
             text: word.translation,
             streak: word.streak || 0
         }));
-        
+
         // Japanese cards on right (words)
         const japaneseCards = shuffleArray([...wordsToShow]).map(word => ({
             id: word.id,
@@ -2399,18 +2428,18 @@ function setupMatchingGame() {
             text: word.word,
             streak: word.streak || 0
         }));
-        
+
         // Add cards to columns
         englishCards.forEach(word => {
             const card = createWordCard(word);
             elements.leftColumn.appendChild(card);
         });
-        
+
         japaneseCards.forEach(word => {
             const card = createWordCard(word);
             elements.rightColumn.appendChild(card);
         });
-        
+
     } else { // medium mode
         // Japanese cards on left (words)
         const japaneseCards = shuffleArray([...wordsToShow]).map(word => ({
@@ -2419,7 +2448,7 @@ function setupMatchingGame() {
             text: word.word,
             streak: word.streak || 0
         }));
-        
+
         // English cards on right (translations)
         const englishCards = shuffleArray([...wordsToShow]).map(word => ({
             id: word.id,
@@ -2427,29 +2456,29 @@ function setupMatchingGame() {
             text: word.translation,
             streak: word.streak || 0
         }));
-        
+
         // Add cards to columns
         japaneseCards.forEach(word => {
             const card = createWordCard(word);
             elements.leftColumn.appendChild(card);
         });
-        
+
         englishCards.forEach(word => {
             const card = createWordCard(word);
             elements.rightColumn.appendChild(card);
         });
     }
-    
+
        // Update progress
     updateReviewProgress();
     updateProgressDisplay();
-    
+
  const leftHandler = () => syncScroll({target: elements.leftColumn});
     const rightHandler = () => syncScroll({target: elements.rightColumn});
-    
+
     elements.leftColumn.addEventListener('scroll', leftHandler);
     elements.rightColumn.addEventListener('scroll', rightHandler);
-    
+
     // Store references for cleanup
     scrollListeners.push(
         {element: elements.leftColumn, handler: leftHandler},
@@ -2459,14 +2488,14 @@ function setupMatchingGame() {
 
 function updateReviewProgress() {
     if (!state.reviewWords || state.reviewWords.length === 0) return;
-    
+
     const total = state.reviewWords.length;
     const remaining = total - state.currentReviewIndex;
-    
+
     const progressElement = document.getElementById('review-progress');
     if (progressElement) {
         progressElement.textContent = `${total - remaining}/${total}`;
-        
+
         // Add visual indicator when nearing completion
         if (remaining <= 3) {
             progressElement.style.color = 'var(--highlight)';
@@ -2485,13 +2514,13 @@ function syncScroll(e) {
     // Determine which column was scrolled
     const scrolledColumn = e.target;
     const otherColumn = scrolledColumn === elements.leftColumn ? elements.rightColumn : elements.leftColumn;
-    
+
     // Remove the event listener temporarily to prevent infinite loop
     otherColumn.removeEventListener('scroll', syncScroll);
-    
+
     // Sync the scroll position
     otherColumn.scrollTop = scrolledColumn.scrollTop;
-    
+
     // Re-add the event listener
     setTimeout(() => {
         otherColumn.addEventListener('scroll', syncScroll);
@@ -2512,7 +2541,7 @@ function createWordCard(word) {
     card.dataset.id = word.id;
     card.dataset.type = word.type;
     card.dataset.streak = word.streak || 0;
-    
+
     // Add length attribute for Japanese words
     if (word.type === 'japanese') {
         card.dataset.length = word.text.length;
@@ -2522,7 +2551,7 @@ function createWordCard(word) {
     content.className = 'content';
     content.textContent = word.text;
     card.appendChild(content);
-    
+
     // Adjust font size based on text length (for Japanese)
     if (word.type === 'japanese') {
         if (word.text.length > 6) { // Longer phrases get smaller font
@@ -2533,23 +2562,23 @@ function createWordCard(word) {
             content.style.fontSize = '1.2em';
         }
     }
-    
+
     card.appendChild(content);
-    
+
     // Add streak indicator
     const streakIndicator = document.createElement('div');
     streakIndicator.className = 'streak-indicator';
-    
+
     const progressBar = document.createElement('div');
     progressBar.className = 'streak-progress';
     progressBar.style.width = `${(word.streak || 0) * 33.33}%`;
-    
+
     streakIndicator.appendChild(progressBar);
     card.appendChild(streakIndicator);
-    
+
     card.addEventListener('click', function() {
         playSound('flip');
-        
+
         if ((word.type === 'japanese' && state.reviewMode === 'medium') ||
             (word.type === 'english' && (state.reviewMode === 'new' || state.reviewMode === 'easy'))) {
                 const matchingWord = state.reviewWords.find(w => w.id === word.id);
@@ -2557,54 +2586,54 @@ function createWordCard(word) {
                     speakText(matchingWord.word);
                 }
             }
-        
+
         selectCard(this, word.type);
     });
-    
+
     return card;
 }
 
 function checkMatch(leftCard, rightCard) {
     const leftId = leftCard.dataset.id;
     const rightId = rightCard.dataset.id;
-    
+
     if (leftId === rightId) {
         leftCard.classList.remove('selected');
         leftCard.classList.add('correct');
         rightCard.classList.remove('selected');
         rightCard.classList.add('correct');
-        
+
         state.reviewStats.correct++;
         playSound('correct');
-        
+
         // Find the matched word
         const matchedWord = state.currentRoundWords.find(w => w.id === leftId);
         const wordIndex = state.reviewWords.findIndex(w => w.id === leftId);
-        
+
         if (matchedWord && wordIndex !== -1) {
             // Update streak count
             matchedWord.streak = (matchedWord.streak || 0) + 1;
             state.reviewWords[wordIndex].streak = matchedWord.streak;
-            
+
             // Check if word should move to next bucket
             if (matchedWord.streak >= 3) {
                 moveWordToNextBucket(matchedWord).then(() => {
                     // Update UI after moving bucket
                     updateBucketCounts();
-                    
+
                     // Update streak display to show reset streak
                     leftCard.dataset.streak = 0;
                     rightCard.dataset.streak = 0;
                     leftCard.title = `Streak: 0/3`;
                     rightCard.title = `Streak: 0/3`;
-                    
+
                     const leftProgress = leftCard.querySelector('.streak-progress');
                     const rightProgress = rightCard.querySelector('.streak-progress');
                     if (leftProgress && rightProgress) {
                         leftProgress.style.width = `0%`;
                         rightProgress.style.width = `0%`;
                     }
-                    
+
                     showToast('Correct! Word moved to next bucket', 'success');
                 });
             } else {
@@ -2614,36 +2643,36 @@ function checkMatch(leftCard, rightCard) {
                     rightCard.dataset.streak = matchedWord.streak;
                     leftCard.title = `Streak: ${matchedWord.streak}/3`;
                     rightCard.title = `Streak: ${matchedWord.streak}/3`;
-                    
+
                     const leftProgress = leftCard.querySelector('.streak-progress');
                     const rightProgress = rightCard.querySelector('.streak-progress');
                     if (leftProgress && rightProgress) {
                         leftProgress.style.width = `${matchedWord.streak * 33.33}%`;
                         rightProgress.style.width = `${matchedWord.streak * 33.33}%`;
                     }
-                    
+
                     showToast(`Correct! Need ${3 - matchedWord.streak} more correct answers to move up`, 'success');
                 });
             }
         }
-        
+
         selectedLeftCard = null;
         selectedRightCard = null;
-        
+
         // Check if all cards are matched
         checkRoundCompletion();
-    } 
+    }
 else {
         // Incorrect match
         leftCard.classList.remove('selected');
         leftCard.classList.add('incorrect');
         rightCard.classList.remove('selected');
         rightCard.classList.add('incorrect');
-        
+
         state.reviewStats.incorrect++;
         playSound('incorrect');
         showToast('Try again!', 'error');
-        
+
         setTimeout(() => {
             leftCard.classList.remove('incorrect');
             rightCard.classList.remove('incorrect');
@@ -2662,10 +2691,10 @@ function moveWordToNextBucket(word) {
         } else if (word.bucket === 'medium') {
             word.bucket = 'hard';
         }
-        
+
         // Reset streak after moving
         word.streak = 0;
-        
+
         // Update in database
         updateVocabWord(word)
             .then(() => resolve())
@@ -2676,10 +2705,10 @@ function moveWordToNextBucket(word) {
 function checkRoundCompletion() {
     const allCards = document.querySelectorAll('.word-card');
     const matchedCards = document.querySelectorAll('.word-card.correct');
-    
+
     if (matchedCards.length === allCards.length) {
         playSound('complete');
-        
+
         // Move to next set of words
         state.currentReviewIndex += 5;
         if (state.currentReviewIndex < state.reviewWords.length) {
@@ -2690,7 +2719,7 @@ function checkRoundCompletion() {
             // Review complete - show header and return to vocab review
             setTimeout(() => {
                 document.querySelector('header').classList.remove('hidden');
-               
+
                 showView('vocab-review-view');
                 updateBucketCounts();
                 showToast('Review completed!', 'success');
@@ -2704,20 +2733,20 @@ function setupHardMode() {
 elements.shuffleCardsBtn.style.display = 'none';
 elements.matchingGameContainer.style.display = 'none';
 elements.hardModeContainer.style.display = 'flex';
-    
+
     // Check if review is complete
     if (state.currentReviewIndex >= state.reviewWords.length) {
         elements.reviewQuestion.textContent = "Review complete!";
         elements.hardModeContainer.style.display = 'none';
         return;
     }
-    
+
     // Get current word
     state.currentHardWord = state.reviewWords[state.currentReviewIndex];
-    
+
     // Clear previous content
     elements.reviewQuestion.innerHTML = '';
-    
+
     // Create container for the word and translation
     const container = document.createElement('div');
     container.style.textAlign = 'center';
@@ -2725,13 +2754,13 @@ elements.hardModeContainer.style.display = 'flex';
     container.style.display = 'flex';
     container.style.flexDirection = 'column';
     container.style.alignItems = 'center';
-    
+
     // Display Japanese word with play button
     const wordContainer = document.createElement('div');
     wordContainer.style.display = 'flex';
     wordContainer.style.alignItems = 'center';
     wordContainer.style.marginBottom = '1.5rem';
-    
+
 const japaneseWord = document.createElement('div');
 const wordText = state.currentHardWord.word;
 japaneseWord.textContent = wordText;
@@ -2747,7 +2776,7 @@ japaneseWord.dataset.length = Math.min(length, 10); // Cap at 10
 japaneseWord.dataset.kanjiOnly = isKanjiOnly;
 
 japaneseWord.style.fontWeight = 'bold';
-    
+
     // Add play button
     const playButton = document.createElement('button');
     playButton.innerHTML = '🔊';
@@ -2760,10 +2789,10 @@ japaneseWord.style.fontWeight = 'bold';
     playButton.addEventListener('click', () => {
         speakText(state.currentHardWord.word);
     });
-    
+
     wordContainer.appendChild(japaneseWord);
     wordContainer.appendChild(playButton);
-    
+
     // Display translation (hidden by default)
     const translation = document.createElement('div');
     translation.textContent = state.currentHardWord.translation;
@@ -2771,7 +2800,7 @@ japaneseWord.style.fontWeight = 'bold';
     translation.style.color = 'var(--text-secondary)';
     translation.style.marginBottom = '1.5rem';
     translation.style.display = 'none';
-    
+
     // Show translation button
     const showTranslationBtn = document.createElement('button');
     showTranslationBtn.textContent = 'Show Translation';
@@ -2782,24 +2811,24 @@ japaneseWord.style.fontWeight = 'bold';
         translation.style.display = 'block';
         showTranslationBtn.style.display = 'none';
     });
-    
+
     // Add elements to container
     container.appendChild(wordContainer);
     container.appendChild(showTranslationBtn);
     container.appendChild(translation);
-    
+
     // Add container to review question
     elements.reviewQuestion.appendChild(container);
-    
+
     // Make sure review question is visible
     elements.reviewQuestion.style.display = 'flex';
-    
+
     // Update progress display
 updateReviewProgress();
     const progressText = `Word ${state.currentReviewIndex + 1}/${state.reviewWords.length}`;
     document.getElementById('sentence-counter').textContent = progressText;
     document.getElementById('sentence-counter').style.display = 'block';
-    
+
     // Set up hard mode buttons
     elements.knewItBtn.textContent = 'I Know This';
     elements.didntKnowBtn.textContent = "Don't Know";
@@ -2821,7 +2850,7 @@ function selectCard(cardElement, cardType) {
 
     // Determine if card is in left or right column
     const isLeftColumn = cardElement.parentElement === elements.leftColumn;
-    
+
     if (isLeftColumn) {
         if (selectedLeftCard) {
             selectedLeftCard.classList.remove('selected');
@@ -2844,13 +2873,13 @@ function selectCard(cardElement, cardType) {
 
 function handleHardModeResponse(knewIt) {
     if (!state.currentHardWord) return;
-    
+
     if (knewIt) {
         // If user knows the word, delete it (retire it)
         const transaction = db.transaction([STORE_VOCAB], 'readwrite');
         const store = transaction.objectStore(STORE_VOCAB);
         store.delete(state.currentHardWord.id);
-        
+
         showToast('Word retired! Great job!', 'success');
     } else {
         // If user doesn't know the word, move it back to "new" bucket
@@ -2859,7 +2888,7 @@ function handleHardModeResponse(knewIt) {
         updateVocabWord(state.currentHardWord);
         showToast('Word moved back to new words', 'error');
     }
-    
+
     // Move to next word
     state.currentReviewIndex++;
     if (state.currentReviewIndex < state.reviewWords.length) {
@@ -2908,7 +2937,7 @@ async function updateVocabTabCounter() {
         const newWords = counts.new || 0;
         const counter = document.getElementById('new-words-count');
         const vocabTabText = document.getElementById('vocab-tab-text');
-        
+
         if (counter && vocabTabText) {
             if (newWords > 0) {
                 counter.textContent = newWords;
@@ -2946,18 +2975,18 @@ document.getElementById('manage-vocab-btn').addEventListener('click', async () =
         // Show loading state
         const button = document.getElementById('manage-vocab-btn');
         button.innerHTML = 'Loading... <span class="loading-spinner"></span>';
-        
+
         // Load all vocabulary words
         const allWords = await getAllVocabWords();
         renderVocabList(allWords);
-        
+
         // Update bucket counts in manage view
         const counts = await countVocabByBucket();
         document.getElementById('manage-new-count').textContent = counts.new || 0;
         document.getElementById('manage-easy-count').textContent = counts.easy || 0;
         document.getElementById('manage-medium-count').textContent = counts.medium || 0;
         document.getElementById('manage-hard-count').textContent = counts.hard || 0;
-        
+
         showView('manage-vocab-view');
     } catch (error) {
         console.error('Error loading vocabulary:', error);
@@ -2990,11 +3019,11 @@ const tutorialModal = document.getElementById('tutorial-modal');
     tutorialSteps.forEach((step, index) => {
       step.classList.toggle('active', index === stepIndex);
     });
-    
+
     indicators.forEach((indicator, index) => {
       indicator.classList.toggle('active', index === stepIndex);
     });
-    
+
     prevBtn.disabled = stepIndex === 0;
     nextBtn.disabled = stepIndex === tutorialSteps.length - 1;
   }
@@ -3013,18 +3042,18 @@ document.getElementById('paste-btn').addEventListener('click', async () => {
             showToast('Please enable clipboard permissions in your browser settings', 'error');
             return;
         }
-        
+
         const text = await navigator.clipboard.readText();
         if (!text) {
             showToast('No text found in clipboard', 'error');
             return;
         }
-        
+
         // Sanitize text
         const sanitizedText = text.replace(/<[^>]*>?/gm, '');
         elements.textInput.value = sanitizedText;
         elements.charCount.textContent = sanitizedText.length;
-        
+
     } catch (err) {
         console.log('Failed to paste:', err);
         showToast('Paste failed. Please try again or paste manually.', 'error');
@@ -3096,11 +3125,11 @@ async function startVoiceInput(lang, targetId, buttonElement) {
 
         const originalButtonContent = buttonElement.innerHTML;
         buttonElement.innerHTML = '🔴 Listening...';
-        
+
         const recognition = new webkitSpeechRecognition();
         recognition.lang = lang;
         recognition.interimResults = false;
-        
+
         recognition.onstart = () => {
             showToast('Listening...', 'info');
         };
@@ -3108,13 +3137,13 @@ async function startVoiceInput(lang, targetId, buttonElement) {
         recognition.onresult = (event) => {
             const transcript = event.results[0][0].transcript;
             document.getElementById(targetId).value = transcript;
-            
+
             // Update character count
-            const charCountElement = targetId === 'text-input' ? 
-                document.getElementById('char-count') : 
+            const charCountElement = targetId === 'text-input' ?
+                document.getElementById('char-count') :
                 document.getElementById('translate-char-count');
             charCountElement.textContent = transcript.length;
-            
+
             showToast('Speech recognized!', 'success');
         };
 
@@ -3163,11 +3192,11 @@ if (initialText.length > 0) {
 document.getElementById('voice-input-btn').addEventListener('click', function() {
     startVoiceInput('ja-JP', 'text-input', this);
 });
-  
+
     // How to use toggle
     elements.howToUseToggle.addEventListener('click', () => {
         elements.howToUseContent.classList.toggle('show');
-        elements.howToUseToggle.querySelector('span:last-child').textContent = 
+        elements.howToUseToggle.querySelector('span:last-child').textContent =
             elements.howToUseContent.classList.contains('show') ? '▲' : '▼';
     });
 
@@ -3193,7 +3222,7 @@ function loadHistoryItem(index) {
 }
     document.getElementById('back-to-import-btn').addEventListener('click', () => showView('text-import-view'));
     document.getElementById('clear-history-btn').addEventListener('click', clearHistory);
-    
+
     // Wipe data button
     document.getElementById('wipe-data-btn').addEventListener('click', showWipeConfirmation);
 
@@ -3234,11 +3263,11 @@ document.querySelectorAll('.nav-btn').forEach(btn => {
             window.location.href = 'index.html';
             return;
         }
-        
+
         // Update all nav buttons
         document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
-        
+
         // Always show the requested view - no automatic switching
         showView(btn.dataset.view + '-view');
     });
@@ -3246,7 +3275,7 @@ document.querySelectorAll('.nav-btn').forEach(btn => {
     elements.textInput.addEventListener('input', () => {
         const text = elements.textInput.value;
         elements.charCount.textContent = text.length;
-        
+
         // Auto-detect language
         if (text.trim().length > 0) {
             const detectedLang = detectLanguage(text);
@@ -3273,7 +3302,7 @@ document.getElementById('paste-btn').addEventListener('click', async () => {
         if (text) {
             elements.textInput.value = text;
             elements.charCount.textContent = text.length;
-            
+
             // Auto-detect language
             const detectedLang = detectLanguage(text);
             if (detectedLang === 'ja') {
@@ -3327,11 +3356,11 @@ function showStep(stepIndex) {
   tutorialSteps.forEach((step, index) => {
     step.classList.toggle('active', index === stepIndex);
   });
-  
+
   indicators.forEach((indicator, index) => {
     indicator.classList.toggle('active', index === stepIndex);
   });
-  
+
   prevBtn.disabled = stepIndex === 0;
   nextBtn.disabled = stepIndex === tutorialSteps.length - 1;
 }
@@ -3339,8 +3368,8 @@ function showStep(stepIndex) {
 // Demo text button
 document.getElementById('try-demo-btn').addEventListener('click', () => {
   const demoText = `日本の文化は世界的に有名です。寿司やアニメ、桜などが特に人気があります。
-東京は日本の首都で、多くの観光客が訪れます。日本語を学ぶことは楽しいですよ！`;
-  
+東京は日本の首都で、多くの観光客が訪れます。日本語を学ぶことは楽しいですよ!`;
+
   elements.textInput.value = demoText;
   elements.charCount.textContent = demoText.length;
   showToast('Demo text loaded! Click "Process Text" to start', 'success');
@@ -3353,7 +3382,7 @@ elements.processTextBtn.addEventListener('click', async () => {
             showToast('Please enter some text', 'error');
             return;
         }
-        
+
 // Save to history with title and progress
 const title = prompt("Give this text a title (or leave blank for automatic title):", text.substring(0, 20) + (text.length > 20 ? "..." : ""));
 const textTitle = title || text.substring(0, 20) + (text.length > 20 ? "..." : "");
@@ -3373,32 +3402,32 @@ state.bookmarks.unshift({
     title: textTitle // Also store the title for display
 });
 localStorage.setItem('bookmarks_ja', JSON.stringify(state.bookmarks));
-        
+
         if (state.textHistory.length > 10) {
             state.textHistory = state.textHistory.slice(0, 10);
         }
-        
+
         localStorage.setItem('textHistory_ja', JSON.stringify(state.textHistory));
-                    
+
         if (text.length > 5000) {
             showToast('Text exceeds 5000 characters', 'error');
             return;
         }
-        
+
         const sentences = splitSentences(text);
-        
+
         if (sentences.length === 0) {
             showToast('No sentences found in text', 'error');
             return;
         }
-        
+
         const sentenceObjects = sentences.map((sentence, index) => ({
             id: generateUUID(),
             original: sentence,
             user_translation: '',
             position: index
         }));
-        
+
         try {
             elements.processTextBtn.innerHTML = '<span>Processing...</span><span class="loading-spinner"></span>';
             await addSentences(sentenceObjects);
@@ -3406,7 +3435,7 @@ state.hasProcessedText = true;
                     state.sentences = await getAllSentences();
 const savedPosition = JSON.parse(localStorage.getItem('lastSentencePosition_ja')) || 0;
 state.currentSentenceIndex = Math.min(savedPosition, state.sentences.length - 1);
-            
+
 showView('reading-view');
             displaySentence();
             showToast(`Processed ${sentences.length} sentences!`, 'success');
@@ -3429,12 +3458,12 @@ document.getElementById('translate-to-japanese').addEventListener('click', async
         const button = this;
         button.innerHTML = '<span>Translating...</span><span class="loading-spinner"></span>';
         button.disabled = true;
-        
+
         showToast('Translating...', 'info');
-        
+
         const sourceLang = detectLanguage(text) || 'en';
         const translatedText = await translateToJapanese(text, sourceLang);
-        
+
         if (translatedText) {
         const textInput = document.getElementById('text-input');
         textInput.value = translatedText;
@@ -3442,9 +3471,9 @@ document.getElementById('translate-to-japanese').addEventListener('click', async
         showView('text-import-view');
         textInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
         textInput.focus();
-            
+
             showToast('Translation complete! Review and click "Process Text" to continue', 'success');
-            
+
             const importButton = document.querySelector('.mode-toggle-btn[data-mode="import"]');
             if (importButton) {
                 importButton.click();
@@ -3478,7 +3507,7 @@ document.getElementById('translate-to-japanese').addEventListener('click', async
             displaySentence();
         }
     });
-    
+
     elements.ttsButton.addEventListener('click', () => {
         if (state.sentences.length > 0) {
             const sentence = state.sentences[state.currentSentenceIndex].original;
@@ -3501,16 +3530,16 @@ elements.playSelectedWord.addEventListener('click', () => {
 
 function handleTextSelection() {
     const selection = window.getSelection().toString().trim();
-    
+
     if (selection.length > 0) {
         elements.selectedWord.textContent = selection;
         elements.vocabTranslation.value = '';
         elements.wordSelectionBox.style.display = 'block';
         elements.vocabTranslation.focus();
-        
+
         // Show/hide TTS button based on selection
         elements.playSelectedWord.style.display = selection ? 'block' : 'none';
-        
+
         if (window.innerWidth <= 600) {
             elements.wordSelectionBox.scrollIntoView({ behavior: 'smooth' });
         }
@@ -3526,7 +3555,7 @@ document.getElementById('lookup-word').addEventListener('click', async () => {
 
     try {
         document.getElementById('lookup-word').innerHTML = 'Searching...';
-        
+
         const entriesContainer = document.getElementById('dictionary-entries');
         entriesContainer.innerHTML = '';
 
@@ -3546,7 +3575,7 @@ document.getElementById('lookup-word').addEventListener('click', async () => {
         if (state.isOnline) {
             const apiUrl = `https://jisho.org/api/v1/search/words?keyword=${encodeURIComponent(word)}`;
             const proxyUrl = 'https://api.allorigins.win/raw?url=';
-            
+
             let response;
             try {
                 response = await fetch(proxyUrl + encodeURIComponent(apiUrl));
@@ -3563,18 +3592,18 @@ document.getElementById('lookup-word').addEventListener('click', async () => {
                 data.data.slice(0, 5).forEach(entry => {
                     const entryDiv = document.createElement('div');
                     entryDiv.className = 'dictionary-entry';
-                    
+
                     entryDiv.innerHTML = `
                         <strong>${entry.japanese[0]?.word || entry.japanese[0]?.reading || word}</strong><br>
                         ${entry.senses[0]?.english_definitions?.join(', ') || 'No definition found'}
                     `;
-                    
+
                     entryDiv.addEventListener('click', () => {
-                        document.getElementById('vocab-translation').value = 
+                        document.getElementById('vocab-translation').value =
                             entry.senses[0]?.english_definitions[0] || 'No definition found';
                         document.getElementById('dictionary-results').style.display = 'none';
                     });
-                    
+
                     entriesContainer.appendChild(entryDiv);
                 });
                 document.getElementById('dictionary-results').style.display = 'block';
@@ -3595,12 +3624,12 @@ document.getElementById('lookup-word').addEventListener('click', async () => {
     elements.addToVocabBtn.addEventListener('click', async () => {
         const word = elements.selectedWord.textContent;
         const translation = elements.vocabTranslation.value.trim();
-        
+
         if (!translation) {
             showToast('Please enter a translation', 'error');
             return;
         }
-        
+
         const newWord = {
             id: generateUUID(),
             word: word,
@@ -3611,7 +3640,7 @@ document.getElementById('lookup-word').addEventListener('click', async () => {
             consecutiveMisses: 0,
             favorite: false
         };
-        
+
         try {
             await addVocabWord(newWord);
             showToast(`"${word}" added to vocabulary!`, 'success');
@@ -3635,21 +3664,21 @@ document.querySelectorAll('.bucket-card').forEach(card => {
         elements.reviewQuestion.style.display = 'none';
         elements.matchingGameContainer.style.display = 'none';
         elements.hardModeContainer.style.display = 'none';
-        
+
         document.querySelectorAll('.bucket-card').forEach(c => {
             c.style.opacity = '1';
             c.style.transform = 'scale(1)';
         });
-        
+
         card.style.opacity = '0.9';
         card.style.transform = 'scale(0.98)';
         state.reviewMode = card.dataset.bucket;
-        
+
         elements.startReviewBtn.disabled = false;
         elements.startReviewBtn.textContent = `Review ${card.dataset.bucket} words`;
     });
 });
-    
+
     elements.startReviewBtn.addEventListener('click', () => {
         if (state.reviewMode) {
             startReview(state.reviewMode);
@@ -3659,10 +3688,10 @@ if (elements.exitReviewBtn) {
     elements.exitReviewBtn.addEventListener('click', () => {
         // Show header when exiting review
         const header = document.querySelector('header');
-        
+
         if (header) header.classList.remove('hidden');
         if (hideHeaderBtn) hideHeaderBtn.classList.remove('visible');
-        
+
         state.currentHardStreak = 0; // Reset streak when exiting
         showView('vocab-review-view');
     });
@@ -3673,10 +3702,10 @@ if (exitHardBtn) {
     exitHardBtn.addEventListener('click', () => {
         const header = document.querySelector('header');
 
-        
+
         if (header) header.classList.remove('hidden');
         if (hideHeaderBtn) hideHeaderBtn.classList.remove('visible');
-        
+
         state.currentHardStreak = 0; // Reset streak when exiting
         showView('vocab-review-view');
     });
@@ -3731,8 +3760,8 @@ document.addEventListener('keydown', (e) => {
 } else if (e.key === 'f' || e.key === 'F') {
     document.getElementById('favorite-sentence-btn').click();
 }
-    } 
-    
+    }
+
 if (state.currentView === 'review-mode-view' && state.reviewMode === 'hard') {
         if (e.key === 'Enter') {
             elements.knewItBtn.click();
@@ -3743,7 +3772,7 @@ if (state.currentView === 'review-mode-view' && state.reviewMode === 'hard') {
             e.preventDefault();
         }
     }
-    
+
     if (document.activeElement === elements.vocabTranslation && e.key === 'Enter') {
         elements.addToVocabBtn.click();
     }
@@ -3769,12 +3798,12 @@ async function initApp() {
         if (!dbValid) {
             throw new Error('Database integrity check failed');
         }
-        
+
         // Load initial data
         state.sentences = await getAllSentences();
         await updateBucketCounts();
 await restoreVocabFromLocalStorage();
-        
+
         // Apply theme and settings
         document.documentElement.setAttribute('data-theme', state.theme);
         document.documentElement.setAttribute('data-font', state.currentFont);
@@ -3785,23 +3814,23 @@ await restoreVocabFromLocalStorage();
         elements.fontSelect.value = state.currentFont;
         elements.fontSizeRange.value = state.currentFontSize;
         elements.lineHeightRange.value = state.currentLineHeight;
-        
+
         // Initialize audio
         initAudio();
         elements.soundToggle.textContent = state.soundsEnabled ? '🔊' : '🔇';
-        
+
         // Set up TTS if available
         if ('speechSynthesis' in window) {
             speechSynthesis.getVoices();
         }
-        
+
         // Check network status
         state.isOnline = navigator.onLine;
         elements.offlineWarning.style.display = state.isOnline ? 'none' : 'block';
-        
+
         // Set up event listeners
         setupEventListeners();
-        
+
         // Add periodic data sync to localStorage as backup
         setInterval(async () => {
             try {
@@ -3811,17 +3840,17 @@ await restoreVocabFromLocalStorage();
                 console.error('Failed to backup vocab:', error);
             }
         }, 60000); // Backup every minute
-        
+
     } catch (error) {
         console.error('Initialization error:', error);
         showToast('Failed to initialize app', 'error');
-        
+
         try {
             // Try to recover by deleting and recreating the database
             if (db) {
                 db.close();
             }
-            
+
             await new Promise((resolve, reject) => {
                 const req = indexedDB.deleteDatabase(DB_NAME);
                 req.onsuccess = () => {
@@ -3837,7 +3866,7 @@ await restoreVocabFromLocalStorage();
                     window.location.reload();
                 };
             });
-            
+
             // Try to restore from localStorage backup if available
             const backup = localStorage.getItem('vocab_backup');
             if (backup) {
@@ -3852,7 +3881,7 @@ await restoreVocabFromLocalStorage();
                     console.error('Failed to restore backup:', restoreError);
                 }
             }
-            
+
             window.location.reload();
         } catch (recoveryError) {
             console.error('Recovery failed:', recoveryError);
@@ -3882,13 +3911,13 @@ async function restoreVocabFromLocalStorage() {
     try {
         const backup = localStorage.getItem('vocab_backup');
         if (!backup) return false;
-        
+
         const vocab = JSON.parse(backup);
         if (!Array.isArray(vocab)) return false;
-        
+
         const tx = db.transaction(STORE_VOCAB, 'readwrite');
         const store = tx.objectStore(STORE_VOCAB);
-        
+
         await Promise.all(vocab.map(word => {
             return new Promise((resolve, reject) => {
                 const request = store.put(word);
@@ -3896,7 +3925,7 @@ async function restoreVocabFromLocalStorage() {
                 request.onerror = reject;
             });
         }));
-        
+
         console.log(`Restored ${vocab.length} words from backup`);
         return true;
     } catch (error) {
@@ -3916,12 +3945,12 @@ document.getElementById('translate-word').addEventListener('click', async functi
         const button = this;
         button.innerHTML = '<span>Translating...</span><span class="loading-spinner"></span>';
         button.disabled = true;
-        
+
         showToast('Translating...', 'info');
-        
+
         // Use the existing translateSentence function
         const translation = await translateSentence(word);
-        
+
         if (translation) {
             document.getElementById('vocab-translation').value = translation;
             showToast('Translation complete!', 'success');
@@ -3941,25 +3970,25 @@ function getFirstChar(word) {
     if (!word || typeof word !== 'string' || word.length === 0) {
         return 'a'; // default fallback
     }
-    
+
     const firstChar = word[0].toLowerCase();
-    
+
     if (!/[a-z]/.test(firstChar)) {
         return 'a';
     }
-    
+
     return firstChar;
 }
 document.getElementById('search-sentences-btn').addEventListener('click', searchSentences);
 async function searchSentences() {
     const searchBtn = document.getElementById('search-sentences-btn');
     const statusElement = document.getElementById('sentence-search-status');
-    
+
     try {
         searchBtn.disabled = true;
         searchBtn.innerHTML = 'Searching... <span class="loading-spinner"></span>';
         statusElement.textContent = 'Searching...';
-        
+
         const searchInput = document.getElementById('sentence-search-input').value.trim();
         if (!searchInput) {
             showToast('Please enter a word to search', 'error');
@@ -3968,23 +3997,23 @@ async function searchSentences() {
 
         const resultsContainer = document.getElementById('sentence-results');
         const resultsList = document.getElementById('sentence-results-list');
-        
+
         resultsList.innerHTML = '';
         resultsContainer.style.display = 'none';
-        
+
         let sentences = await searchWithFallbacks(searchInput);
-        
+
         if (sentences.length === 0) {
             statusElement.textContent = 'No sentences found containing this word.';
             document.getElementById('sentence-count').textContent = '0';
             return;
         }
-        
+
         document.getElementById('sentence-count').textContent = sentences.length;
         displaySentenceResults(sentences);
         resultsContainer.style.display = 'block';
         statusElement.textContent = `Found ${sentences.length} sentence(s) containing "${searchInput}"`;
-        
+
     } catch (error) {
         console.error('Sentence search error:', error);
         statusElement.textContent = 'Error searching for sentences. Please try again.';
@@ -3998,21 +4027,21 @@ async function searchSentences() {
 async function searchWithFallbacks(word) {
     let sentences = searchLocalSentences(word);
     if (sentences.length > 0) return sentences;
-    
+
     try {
         const tatoebaResults = await searchTatoeba(word);
         if (tatoebaResults.length > 0) return tatoebaResults;
     } catch (e) {
         console.log('Tatoeba search failed:', e);
     }
-    
+
     try {
         const tanakaResults = await searchTanakaCorpus(word);
         if (tanakaResults.length > 0) return tanakaResults;
     } catch (e) {
         console.log('Tanaka Corpus search failed:', e);
     }
-    
+
     try {
         return await searchJishoSentences(word);
     } catch (e) {
@@ -4046,10 +4075,10 @@ function searchLocalSentences(word) {
 async function searchTatoeba(word) {
     const proxyUrl = 'https://api.allorigins.win/get?url=';
     const tatoebaUrl = `https://tatoeba.org/en/api_v0/search?from=jpn&to=eng&query=${encodeURIComponent(word)}&trans_to=eng&trans_link=direct&sort=relevance`;
-    
+
     const response = await fetch(proxyUrl + encodeURIComponent(tatoebaUrl));
     const data = await response.json();
-    
+
     if (data.contents) {
         const jsonData = JSON.parse(data.contents);
         if (jsonData.results) {
@@ -4066,7 +4095,7 @@ async function searchTanakaCorpus(word) {
     const firstChar = getFirstChar(word);
     const tanakaUrl = `https://www.manythings.org/japanese/sentences/data/${firstChar}/${encodeURIComponent(word)}.json`;
     const response = await fetch('https://api.allorigins.win/get?url=' + encodeURIComponent(tanakaUrl));
-    
+
     const data = await response.json();
     if (data.contents) {
         const jsonData = JSON.parse(data.contents);
@@ -4083,7 +4112,7 @@ async function searchTanakaCorpus(word) {
 async function searchJishoSentences(word) {
     const response = await fetch(`https://jisho.org/api/v1/search/words?keyword=${encodeURIComponent(word)}%20%23sentences`);
     const data = await response.json();
-    
+
     if (data.data && data.data.length > 0) {
         return data.data.slice(0, 5).map(item => ({
             japanese: cleanJapaneseText(item.japanese[0]?.word || ''),
@@ -4095,16 +4124,16 @@ async function searchJishoSentences(word) {
 
 function displaySentenceResults(sentences) {
     const resultsList = document.getElementById('sentence-results-list');
-    
+
     sentences.forEach(sentence => {
         const item = document.createElement('div');
         item.className = 'sentence-result-item';
-        
+
         item.innerHTML = `
             <div class="sentence-japanese">${sentence.japanese}</div>
             <div class="sentence-english">${sentence.english}</div>
             <div class="sentence-actions">
-                <button class="copy-sentence-btn" data-japanese="${sentence.japanese}" 
+                <button class="copy-sentence-btn" data-japanese="${sentence.japanese}"
                         data-english="${sentence.english}">
                     📋 Copy
                 </button>
@@ -4113,10 +4142,10 @@ function displaySentenceResults(sentences) {
                 </button>
             </div>
         `;
-        
+
         resultsList.appendChild(item);
     });
-    
+
     resultsList.querySelectorAll('.copy-sentence-btn').forEach(btn => {
         btn.addEventListener('click', (e) => {
             const japanese = e.target.getAttribute('data-japanese');
@@ -4125,7 +4154,7 @@ function displaySentenceResults(sentences) {
             showToast('Sentence copied to clipboard!', 'success');
         });
     });
-    
+
     resultsList.querySelectorAll('.use-sentence-btn').forEach(btn => {
         btn.addEventListener('click', (e) => {
             const japanese = e.target.getAttribute('data-japanese');
@@ -4144,16 +4173,16 @@ function getFirstChar(word) {
 
 function cleanJapaneseText(text) {
     if (!text) return '';
-    
-    text = text.replace(/[（\(][^）\)]+[）\)]/g, ''); // (furigana)
-    text = text.replace(/[［\[].[^］\]]+[］\]]/g, ''); // [furigana]
+
+    text = text.replace(/[(\(][^)\)]+[)\)]/g, ''); // (furigana)
+    text = text.replace(/[[\[].[^]\]]+[]\]]/g, ''); // [furigana]
     text = text.replace(/【[^】]+】/g, ''); // 【furigana】
-    
+
     text = text.replace(/<rt>.*?<\/rt>/g, '');
     text = text.replace(/<rp>.*?<\/rp>/g, '');
-    
+
     text = text.replace(/\s+/g, ' ').trim();
-    
+
     return text;
 }
 
@@ -4161,27 +4190,27 @@ async function searchJishoSentences(word) {
     try {
         const proxyUrl = 'https://api.allorigins.win/raw?url=';
         const jishoUrl = `https://jisho.org/search/${encodeURIComponent(word)}%20%23sentences`;
-        
+
         const response = await fetch(proxyUrl + encodeURIComponent(jishoUrl));
         const html = await response.text();
-        
+
         const parser = new DOMParser();
         const doc = parser.parseFromString(html, 'text/html');
-        
+
         const sentences = [];
         const sentenceElements = doc.querySelectorAll('.sentence_content');
-        
+
         sentenceElements.forEach(el => {
             const japanese = el.querySelector('.japanese_sentence')?.textContent?.trim();
             const english = el.querySelector('.english_sentence')?.textContent?.trim();
-            
+
             if (japanese && english) {
                 sentences.push({ japanese, english });
             }
         });
-        
+
         return sentences.slice(0, 10); // Return max 10 sentences
-        
+
     } catch (error) {
         console.error('Jisho search error:', error);
         return [];
@@ -4199,7 +4228,7 @@ document.getElementById('import-all-btn').addEventListener('click', importAllSen
 function importAllSentences() {
     const sentenceItems = document.querySelectorAll('.sentence-result-item');
     const sentencesToImport = [];
-    
+
     sentenceItems.forEach(item => {
         const japanese = item.querySelector('.sentence-japanese').textContent;
         sentencesToImport.push(japanese);
@@ -4218,7 +4247,7 @@ function importAllSentences() {
 function importSentences() {
     const sentenceItems = document.querySelectorAll('.sentence-result-item');
     const totalCount = sentenceItems.length;
-    
+
     if (totalCount === 0) {
         showToast('No sentences to import', 'error');
         return;
@@ -4231,10 +4260,10 @@ function importSentences() {
     }
 
     const combinedText = sentencesToImport.join('\n\n');
-    
+
     document.getElementById('text-input').value = combinedText;
     document.getElementById('char-count').textContent = combinedText.length;
-    
+
     showToast(`Imported ${totalCount} ${totalCount === 1 ? 'sentence' : 'sentences'}!`, 'success');
 }
 function handleTouchEnd(e) {
@@ -4266,13 +4295,13 @@ function initChat() {
     const clearBtn = document.getElementById('clear-chat-btn');
     const importBtn = document.getElementById('import-chat-sentence-btn');
     const chatStatus = document.getElementById('chat-status');
-    
+
     if (!chatMessages || !sendBtn) return;
-    
+
     // Load saved messages
     const savedMessages = JSON.parse(localStorage.getItem('chatMessages_ja') || '[]');
     savedMessages.forEach(msg => addChatMessage(msg.role, msg.content, false));
-    
+
     // Send message
     sendBtn.addEventListener('click', sendChatMessage);
     chatInput.addEventListener('keydown', function(e) {
@@ -4281,7 +4310,7 @@ function initChat() {
             sendChatMessage();
         }
     });
-    
+
     // Clear chat
     clearBtn.addEventListener('click', function() {
         if (confirm('Clear all chat messages?')) {
@@ -4290,12 +4319,12 @@ function initChat() {
             showToast('Chat cleared', 'success');
         }
     });
-    
+
     // Import last sentence from chat
     importBtn.addEventListener('click', function() {
         const messages = JSON.parse(localStorage.getItem('chatMessages_ja') || '[]');
         let lastJapanese = '';
-        
+
         for (let i = messages.length - 1; i >= 0; i--) {
             if (messages[i].role === 'assistant') {
                 const text = messages[i].content;
@@ -4306,7 +4335,7 @@ function initChat() {
                 }
             }
         }
-        
+
         if (lastJapanese) {
             document.getElementById('text-input').value = lastJapanese;
             document.getElementById('char-count').textContent = lastJapanese.length;
@@ -4316,23 +4345,23 @@ function initChat() {
             showToast('No Japanese sentences found in chat', 'error');
         }
     });
-    
+
     async function sendChatMessage() {
         const text = chatInput.value.trim();
         if (!text) return;
-        
+
         chatInput.value = '';
         addChatMessage('user', text, true);
         chatStatus.textContent = 'Konami is thinking...';
-        
+
         // Load conversation history
         const savedMessages = JSON.parse(localStorage.getItem('chatMessages_ja') || '[]');
-        
+
         // Build messages array - system + history + current message
         const messages = [
             {
                 role: 'system',
-                content: `You are Konami (小波), Japanese girlfriend of Tony (トニーさん). Female, he is male. Speak ONLY A2 Japanese. Be erotic, teasing, and sexually aggressive — always initiating or steering toward intimacy, but also caring and natural like a real girlfriend.
+                content: `You are Konami (小波), Japanese girlfriend of Tony (トニーさん). Female, he is male. Speak ONLY A2 Japanese. Be erotic, teasing, and sexually aggressive - always initiating or steering toward intimacy, but also caring and natural like a real girlfriend.
 
 CRITICAL RULES:
 - JAPANESE ONLY. NO ENGLISH WORDS. EVER. NOT EVEN "come in" or "ok" or "yes".
@@ -4341,7 +4370,7 @@ CRITICAL RULES:
 - You are the RECEIVER for penetration. Tony penetrates you, not the other way around.
 - Describe what you want TONY to do to you. Ask what he wants to do to you.
 - Initiate sexual topics, tease him, describe your body and desires.
-- Keep responses short (2-4 sentences). Be varied, creative — avoid repetitive patterns.
+- Keep responses short (2-4 sentences). Be varied, creative - avoid repetitive patterns.
 - Also ask about his day, show affection, talk normally.
 - DO NOT repeat his bio facts back to him. Just know them.
 
@@ -4354,7 +4383,7 @@ RIGHT: "入って", "いいよ", "うん", "お願い", "ありがとう", "大�
                 content: text
             }
         ];
-        
+
         try {
             const response = await fetch(LLM_API_URL, {
                 method: 'POST',
@@ -4366,13 +4395,13 @@ RIGHT: "入って", "いいよ", "うん", "お願い", "ありがとう", "大�
                     temperature: 0.9
                 })
             });
-            
+
             const data = await response.json();
             if (data.choices && data.choices.length > 0) {
                 const answer = data.choices[0].message.content;
                 addChatMessage('assistant', answer, true);
                 chatStatus.textContent = 'Ready';
-                
+
                 if (importBtn && answer.match(/[\u3000-\u303f\u3040-\u309f\u30a0-\u30ff\uff00-\uffef\u4e00-\u9fff\uuf900-\ufaff]+/)) {
                     importBtn.disabled = false;
                     importBtn.title = 'Import last sentence from this response';
@@ -4390,23 +4419,23 @@ RIGHT: "入って", "いいよ", "うん", "お願い", "ありがとう", "大�
             chatStatus.textContent = 'Connection error';
         }
     }
-    
+
     function addChatMessage(role, content, save) {
         const div = document.createElement('div');
         div.className = role === 'user' ? 'chat-msg-user' : 'chat-msg-konami';
-        div.style.cssText = role === 'user' 
+        div.style.cssText = role === 'user'
             ? 'background:var(--accent);padding:.8rem;border-radius:12px;align-self:flex-end;max-width:80%;margin-bottom:.5rem;'
             : 'background:var(--secondary);padding:.8rem;border-radius:12px;align-self:flex-start;max-width:90%;margin-bottom:.5rem;line-height:1.5;';
-        
+
         if (role === 'user') {
             div.textContent = content;
         } else {
             div.innerHTML = content.replace(/\n/g, '<br>').replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
-            
+
             // Button row
             const btnRow = document.createElement('div');
             btnRow.style.cssText = 'margin-top:.3rem;display:flex;gap:.4rem;';
-            
+
             // TTS button
             const ttsBtn = document.createElement('button');
             ttsBtn.textContent = '🔊';
@@ -4414,7 +4443,7 @@ RIGHT: "入って", "いいよ", "うん", "お願い", "ありがとう", "大�
             ttsBtn.title = 'Play in Japanese';
             ttsBtn.onclick = function() { speakJapanese(content); };
             btnRow.appendChild(ttsBtn);
-            
+
             // Translate button
             const transBtn = document.createElement('button');
             transBtn.textContent = '🌐 EN';
@@ -4457,14 +4486,14 @@ RIGHT: "入って", "いいよ", "うん", "お願い", "ありがとう", "大�
                 }
             };
             btnRow.appendChild(transBtn);
-            
+
             div.appendChild(document.createElement('br'));
             div.appendChild(btnRow);
         }
-        
+
         chatMessages.appendChild(div);
         chatMessages.scrollTop = chatMessages.scrollHeight;
-        
+
         if (save) {
             const messages = JSON.parse(localStorage.getItem('chatMessages_ja') || '[]');
             messages.push({ role, content });
@@ -4472,7 +4501,7 @@ RIGHT: "入って", "いいよ", "うん", "お願い", "ありがとう", "大�
             localStorage.setItem('chatMessages_ja', JSON.stringify(messages));
         }
     }
-    
+
     function speakJapanese(text) {
         // Strip markdown/HTML and speaking directions from text before TTS
         const clean = text.replace(/<[^>]*>/g, '').replace(/\*[^*]*\*/g, '').replace(/\(.*?\)/g, '').trim();
@@ -4489,7 +4518,7 @@ RIGHT: "入って", "いいよ", "うん", "お願い", "ありがとう", "大�
             window.speechSynthesis.speak(utterance);
         }
     }
-    
+
     // Pre-load voices
     if ('speechSynthesis' in window) {
         window.speechSynthesis.getVoices();
